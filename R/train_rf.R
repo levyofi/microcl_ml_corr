@@ -84,7 +84,7 @@ train_rf <- function(train_X, train_y,
     )
 
     if (!is.null(val_X) && !is.null(val_y)) {
-      preds <- predict(model, data = as.data.frame(val_X))$predictions
+      preds <- stats::predict(model, data = as.data.frame(val_X))$predictions
       mse <- mean((preds - val_y)^2)
     } else {
       # Use OOB prediction error

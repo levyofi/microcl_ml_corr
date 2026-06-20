@@ -30,7 +30,7 @@ correct_predictions <- function(model, new_data,
 
   if (model_type == "rf") {
     X <- new_data[, feature_cols, drop = FALSE]
-    pred_res <- predict(model, data = as.data.frame(X))$predictions
+    pred_res <- stats::predict(model, data = as.data.frame(X))$predictions
     base <- new_data[[prediction_col]]
 
     result <- data.frame(

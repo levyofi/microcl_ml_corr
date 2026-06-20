@@ -11,13 +11,17 @@ suppressPackageStartupMessages({
   library(keras3)
 })
 
-# Source package functions
-pkg_dir <- "/home/ofir/Dropbox/Antigravity/NichMapR_ml_corr/microcl_ml_corr/R"
-for (f in list.files(pkg_dir, pattern = "\\.R$", full.names = TRUE)) {
-  source(f, local = FALSE)
+# Load package dynamically
+args <- commandArgs(trailingOnly = FALSE)
+file_flag <- grep("^--file=", args, value = TRUE)
+if (length(file_flag) > 0) {
+  pkg_root <- normalizePath(dirname(dirname(sub("^--file=", "", file_flag))))
+} else {
+  pkg_root <- normalizePath("..")
 }
+suppressMessages(devtools::load_all(pkg_root, quiet = TRUE))
 
-PROJECT_ROOT <- "/home/ofir/Dropbox/Antigravity/NichMapR_ml_corr"
+PROJECT_ROOT <- normalizePath(file.path(pkg_root, ".."))
 HAROD_PATH   <- file.path(PROJECT_ROOT, "data/experiments_data/Harod_dataset.csv")
 OUTPUT_DIR   <- file.path(PROJECT_ROOT, "microcl_ml_corr/outputs/phase_1_full")
 dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)

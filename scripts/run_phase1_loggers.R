@@ -17,26 +17,20 @@ suppressPackageStartupMessages({
   library(ranger)
 })
 
-# --- Load the microclCorr package functions ---
-# Source the R package functions directly (since we're developing)
-pkg_dir <- file.path(dirname(dirname(normalizePath(sys.frame(1)$ofile %||% "."))),
-                     "microclCorr", "R")
-if (!dir.exists(pkg_dir)) {
-  # Fallback: try relative to project root
-  pkg_dir <- file.path(Sys.getenv("PROJECT_ROOT",
-    unset = file.path(dirname(dirname(normalizePath("."))))),
-    "microclCorr", "R")
+# --- Load the microclCorr package ---
+args <- commandArgs(trailingOnly = FALSE)
+file_flag <- grep("^--file=", args, value = TRUE)
+if (length(file_flag) > 0) {
+  pkg_root <- normalizePath(dirname(dirname(sub("^--file=", "", file_flag))))
+} else {
+  pkg_root <- normalizePath("..")
 }
-
-# Source all R files in package
-for (f in list.files(pkg_dir, pattern = "\\.R$", full.names = TRUE)) {
-  source(f, local = FALSE)
-}
+suppressMessages(devtools::load_all(pkg_root, quiet = TRUE))
 
 # ===========================================================
 # CONFIGURATION
 # ===========================================================
-PROJECT_ROOT <- normalizePath(file.path(dirname(sys.frame(1)$ofile %||% "."), ".."))
+PROJECT_ROOT <- normalizePath(file.path(pkg_root, ".."))
 
 # Data paths
 HAROD_PATH   <- file.path(PROJECT_ROOT, "data/experiments_data/Harod_dataset.csv")

@@ -19,7 +19,7 @@ evaluate_correction <- function(model, X, y, base_prediction,
 
   # Predict residuals
   if (model_type == "rf") {
-    pred_res <- predict(model, data = as.data.frame(X))$predictions
+    pred_res <- stats::predict(model, data = as.data.frame(X))$predictions
   } else {
     pred_res <- as.numeric(model |> keras3::predict_on_batch(X))
   }
