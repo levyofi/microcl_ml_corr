@@ -1,0 +1,33 @@
+Package: microclCorr
+Title: Machine Learning Correction of Microclimate Model Predictions
+Version: 0.1.0
+Authors@R: c(
+    person("Gilad", "Mazor", role = c("aut", "cre"), email = "gilad.mazor@mail.huji.ac.il"),
+    person("Ofir", "Levy", role = "aut"))
+Description: Provides functions to train Random Forest and LSTM models
+    that correct systematic biases in physical microclimate model predictions
+    (e.g. NicheMapR) using temperature logger measurements. Supports data
+    alignment, feature engineering, model training with optional hyperparameter
+    tuning, and prediction correction across multiple habitats and spatial scales.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+URL: https://github.com/giladmazor/microcl_ml_corr
+BugReports: https://github.com/giladmazor/microcl_ml_corr/issues
+Imports:
+    dplyr,
+    lubridate,
+    ranger,
+    keras3,
+    tensorflow,
+    data.table,
+    stats
+Suggests:
+    NicheMapR,
+    testthat (>= 3.0.0),
+    knitr,
+    rmarkdown,
+    reticulate
+Config/testthat/edition: 3
+VignetteBuilder: knitr
