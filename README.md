@@ -1,6 +1,6 @@
 # microclCorr: Machine Learning Correction of Microclimate Model Predictions
 
-[![R-CMD-check](https://img.shields.io/badge/R--CMD--check-passing-brightgreen.svg)](https://github.com/giladmazor/microcl_ml_corr)
+[![R-CMD-check](https://img.shields.io/badge/R--CMD--check-passing-brightgreen.svg)](https://github.com/levyofi/microcl_ml_corr)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 The `microclCorr` R package provides a robust, production-grade machine learning pipeline to correct systematic biases in physical microclimate models (such as **NicheMapR**) using temperature logger measurements. 
@@ -43,7 +43,7 @@ install.packages(c("dplyr", "lubridate", "ranger", "data.table", "reticulate"))
 Install the package directly from the repository:
 
 ```R
-devtools::install_github("giladmazor/microcl_ml_corr")
+devtools::install_github("levyofi/microcl_ml_corr")
 ```
 
 ### 3. Configure TensorFlow & Keras Backend (For LSTM Models)
