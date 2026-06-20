@@ -13,20 +13,38 @@ suppressPackageStartupMessages({
 })
 
 # Determine project root and source package functions
-PROJECT_ROOT <- "/home/ofir/Dropbox/Antigravity/NichMapR_ml_corr"
-pkg_dir <- file.path(PROJECT_ROOT, "microcl_ml_corr/R")
-if (dir.exists(pkg_dir)) {
-  for (f in list.files(pkg_dir, pattern = "\\.R$", full.names = TRUE)) {
-    source(f, local = FALSE)
-  }
+pkg_examples_dir <- system.file("examples", package = "microclCorr")
+if (pkg_examples_dir != "") {
+  # Installed package
+  HAROD_PATH   <- system.file("extdata", "Harod_dataset.csv", package = "microclCorr")
+  SCENARIO_DIR <- system.file("examples", "scenario_1_valley", package = "microclCorr")
+  OUTPUT_DIR   <- file.path(getwd(), "scenario_1_valley_results")
 } else {
-  library(microclCorr)
+  # Local development fallback
+  pkg_dir <- ""
+  for (path in c("../../../R", "../../R", "./R", "microcl_ml_corr/R")) {
+    if (dir.exists(path)) {
+      pkg_dir <- path
+      break
+    }
+  }
+  if (pkg_dir != "") {
+    for (f in list.files(pkg_dir, pattern = "\\.R$", full.names = TRUE)) {
+      source(f, local = FALSE)
+    }
+  } else {
+    library(microclCorr)
+  }
+  HAROD_PATH   <- ""
+  for (path in c("../../../inst/extdata/Harod_dataset.csv", "../../inst/extdata/Harod_dataset.csv", "./inst/extdata/Harod_dataset.csv", "microcl_ml_corr/inst/extdata/Harod_dataset.csv")) {
+    if (file.exists(path)) {
+      HAROD_PATH <- path
+      break
+    }
+  }
+  SCENARIO_DIR <- "."
+  OUTPUT_DIR   <- "./results"
 }
-
-# Configuration
-HAROD_PATH   <- file.path(PROJECT_ROOT, "data/experiments_data/Harod_dataset.csv")
-SCENARIO_DIR <- file.path(PROJECT_ROOT, "microcl_ml_corr/inst/examples/scenario_1_valley")
-OUTPUT_DIR   <- file.path(SCENARIO_DIR, "results")
 SEED         <- 123
 N_RUNS       <- 5
 TRAINING_DAYS <- c(1, 2, 3, 7, 14, 21, 28, 35, 42)

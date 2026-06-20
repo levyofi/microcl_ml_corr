@@ -14,27 +14,71 @@ suppressPackageStartupMessages({
 })
 
 # Determine project root and source package functions
-PROJECT_ROOT <- "/home/ofir/Dropbox/Antigravity/NichMapR_ml_corr"
-pkg_dir <- file.path(PROJECT_ROOT, "microcl_ml_corr/R")
-if (dir.exists(pkg_dir)) {
-  for (f in list.files(pkg_dir, pattern = "\\.R$", full.names = TRUE)) {
-    source(f, local = FALSE)
-  }
+pkg_examples_dir <- system.file("examples", package = "microclCorr")
+if (pkg_examples_dir != "") {
+  # Installed package
+  BEACH_PATH       <- system.file("extdata", "Beach_data_preprocessed.csv", package = "microclCorr")
+  DESERT_PATH      <- system.file("extdata", "desert_data_preprocessed.csv", package = "microclCorr")
+  BEACH_SPLITS     <- system.file("extdata", "beach_splits.csv", package = "microclCorr")
+  DESERT_SPLITS    <- system.file("extdata", "desert_splits.csv", package = "microclCorr")
+  PHASE2_DIR       <- file.path(getwd(), "phase2_reports")
+  PY_OUTPUT_DIR    <- file.path(getwd(), "py_outputs")
+  RESULTS_DIR      <- file.path(getwd(), "phase2_results")
 } else {
-  library(microclCorr)
+  # Local development fallback
+  pkg_dir <- ""
+  for (path in c("../../../R", "../../R", "./R", "microcl_ml_corr/R")) {
+    if (dir.exists(path)) {
+      pkg_dir <- path
+      break
+    }
+  }
+  if (pkg_dir != "") {
+    for (f in list.files(pkg_dir, pattern = "\\.R$", full.names = TRUE)) {
+      source(f, local = FALSE)
+    }
+  } else {
+    library(microclCorr)
+  }
+  BEACH_PATH       <- ""
+  for (path in c("../../../inst/extdata/Beach_data_preprocessed.csv", "../../inst/extdata/Beach_data_preprocessed.csv", "./inst/extdata/Beach_data_preprocessed.csv", "microcl_ml_corr/inst/extdata/Beach_data_preprocessed.csv")) {
+    if (file.exists(path)) {
+      BEACH_PATH <- path
+      break
+    }
+  }
+  DESERT_PATH      <- ""
+  for (path in c("../../../inst/extdata/desert_data_preprocessed.csv", "../../inst/extdata/desert_data_preprocessed.csv", "./inst/extdata/desert_data_preprocessed.csv", "microcl_ml_corr/inst/extdata/desert_data_preprocessed.csv")) {
+    if (file.exists(path)) {
+      DESERT_PATH <- path
+      break
+    }
+  }
+  BEACH_SPLITS     <- ""
+  for (path in c("../../../inst/extdata/beach_splits.csv", "../../inst/extdata/beach_splits.csv", "./inst/extdata/beach_splits.csv", "microcl_ml_corr/inst/extdata/beach_splits.csv")) {
+    if (file.exists(path)) {
+      BEACH_SPLITS <- path
+      break
+    }
+  }
+  DESERT_SPLITS    <- ""
+  for (path in c("../../../inst/extdata/desert_splits.csv", "../../inst/extdata/desert_splits.csv", "./inst/extdata/desert_splits.csv", "microcl_ml_corr/inst/extdata/desert_splits.csv")) {
+    if (file.exists(path)) {
+      DESERT_SPLITS <- path
+      break
+    }
+  }
+  
+  PHASE2_DIR       <- "./reports/phase_2"
+  PY_OUTPUT_DIR    <- "./pipeline_v2/outputs/phase_2"
+  RESULTS_DIR      <- "./microcl_ml_corr/inst/examples/phase_2_generalization/results"
 }
-
-# Configuration
-BEACH_PATH    <- file.path(PROJECT_ROOT, "data/experiments_data/Beach_data_preprocessed.csv")
-DESERT_PATH   <- file.path(PROJECT_ROOT, "data/experiments_data/desert_data_preprocessed.csv")
-PHASE2_DIR    <- file.path(PROJECT_ROOT, "reports/phase_2")
-PY_OUTPUT_DIR <- file.path(PROJECT_ROOT, "pipeline_v2/outputs/phase_2")
 SEED          <- 42
 SPLIT_SEED    <- 123
 N_RUNS        <- 1 # Standard single execution for final results
 
 dir.create(PHASE2_DIR, recursive = TRUE, showWarnings = FALSE)
-dir.create(file.path(PROJECT_ROOT, "microcl_ml_corr/inst/examples/phase_2_generalization/results"), recursive = TRUE, showWarnings = FALSE)
+dir.create(RESULTS_DIR, recursive = TRUE, showWarnings = FALSE)
 
 # Helper function to load aligned splits from Python export with exact timezone matching
 load_aligned_splits <- function(data, split_csv_path, site_col, datetime_col = "time") {
@@ -112,7 +156,7 @@ if ("microhabitat_sun" %in% names(beach_data)) {
   beach_data$microhabitat_sun <- NULL
 }
 
-beach_splits_csv <- file.path(PROJECT_ROOT, "data/experiments_data/beach_splits.csv")
+beach_splits_csv <- BEACH_SPLITS
 beach_splits <- load_aligned_splits(beach_data, beach_splits_csv, "time_series_site")
 
 scaled_beach <- lstm_scaling(beach_splits$train, beach_splits$val, beach_splits$test)
@@ -234,7 +278,7 @@ for (loc in beach_locations) {
 cat("\n=== RUNNING DESERT HABITAT EXPERIMENTS ===\n")
 desert_data <- prepare_desert_data(DESERT_PATH)
 
-desert_splits_csv <- file.path(PROJECT_ROOT, "data/experiments_data/desert_splits.csv")
+desert_splits_csv <- DESERT_SPLITS
 desert_splits <- load_aligned_splits(desert_data, desert_splits_csv, "site_id")
 
 scaled_desert <- lstm_scaling(desert_splits$train, desert_splits$val, desert_splits$test)
@@ -352,7 +396,7 @@ for (loc in desert_locations) {
 
 # Save consolidated R results
 results_r_df <- do.call(rbind, all_results_r)
-write.csv(results_r_df, file.path(PROJECT_ROOT, "microcl_ml_corr/inst/examples/phase_2_generalization/results/phase2_all_r_results.csv"), row.names = FALSE)
+write.csv(results_r_df, file.path(RESULTS_DIR, "phase2_all_r_results.csv"), row.names = FALSE)
 cat("\nSaved consolidated R Phase 2 results.\n")
 
 # =========================================================================
@@ -559,7 +603,9 @@ The Judean Desert contains 48 loggers. To visualize performance, we aggregate th
 # Write report markdown
 writeLines(report_markdown, file.path(PHASE2_DIR, "phase2_complete_report_r.md"))
 ARTIFACT_DIR <- "/home/ofir/.gemini/antigravity/brain/e90bb647-ed32-45e9-b7e3-afc6764c2c96"
-writeLines(report_markdown, file.path(ARTIFACT_DIR, "phase2_complete_report_r.md"))
+if (dir.exists(ARTIFACT_DIR)) {
+  writeLines(report_markdown, file.path(ARTIFACT_DIR, "phase2_complete_report_r.md"))
+}
 cat(sprintf("Saved complete report to: %s\n", file.path(PHASE2_DIR, "phase2_complete_report_r.md")))
 
 # =========================================================================
@@ -594,7 +640,9 @@ p1 <- ggplot(plot_beach, aes(x = ts_name, y = RMSE, fill = Pipeline)) +
   )
 
 ggsave(file.path(PHASE2_DIR, "r_vs_python_beach_comparison.png"), p1, width = 10, height = 6.5, dpi = 300)
-ggsave(file.path(ARTIFACT_DIR, "r_vs_python_beach_comparison.png"), p1, width = 10, height = 6.5, dpi = 300)
+if (dir.exists(ARTIFACT_DIR)) {
+  ggsave(file.path(ARTIFACT_DIR, "r_vs_python_beach_comparison.png"), p1, width = 10, height = 6.5, dpi = 300)
+}
 
 # 2. Desert Plot (Aggregated by microhabitat and region)
 plot_desert <- parity_df %>% filter(habitat == "Desert") %>%
@@ -636,6 +684,8 @@ p2 <- ggplot(plot_desert, aes(x = Label, y = RMSE, fill = Pipeline)) +
   )
 
 ggsave(file.path(PHASE2_DIR, "r_vs_python_desert_comparison.png"), p2, width = 10, height = 6.5, dpi = 300)
-ggsave(file.path(ARTIFACT_DIR, "r_vs_python_desert_comparison.png"), p2, width = 10, height = 6.5, dpi = 300)
+if (dir.exists(ARTIFACT_DIR)) {
+  ggsave(file.path(ARTIFACT_DIR, "r_vs_python_desert_comparison.png"), p2, width = 10, height = 6.5, dpi = 300)
+}
 
 cat("\n=== All Phase 2 Tasks Finished Successfully ===\n")

@@ -12,19 +12,47 @@ suppressPackageStartupMessages({
   library(keras3)
 })
 
-PROJECT_ROOT <- "/home/ofir/Dropbox/Antigravity/NichMapR_ml_corr"
-pkg_dir <- file.path(PROJECT_ROOT, "microcl_ml_corr/R")
-if (dir.exists(pkg_dir)) {
-  for (f in list.files(pkg_dir, pattern = "\\.R$", full.names = TRUE)) {
-    source(f, local = FALSE)
-  }
+# Determine project root and source package functions
+pkg_examples_dir <- system.file("examples", package = "microclCorr")
+if (pkg_examples_dir != "") {
+  # Installed package
+  DESERT_PATH  <- system.file("extdata", "desert_data_preprocessed.csv", package = "microclCorr")
+  SPLITS_PATH  <- system.file("extdata", "desert_splits.csv", package = "microclCorr")
+  SCENARIO_DIR <- system.file("examples", "scenario_7_desert_specialized", package = "microclCorr")
+  OUTPUT_DIR   <- file.path(getwd(), "scenario_7_desert_specialized_results")
 } else {
-  library(microclCorr)
+  # Local development fallback
+  pkg_dir <- ""
+  for (path in c("../../../R", "../../R", "./R", "microcl_ml_corr/R")) {
+    if (dir.exists(path)) {
+      pkg_dir <- path
+      break
+    }
+  }
+  if (pkg_dir != "") {
+    for (f in list.files(pkg_dir, pattern = "\\.R$", full.names = TRUE)) {
+      source(f, local = FALSE)
+    }
+  } else {
+    library(microclCorr)
+  }
+  DESERT_PATH  <- ""
+  for (path in c("../../../inst/extdata/desert_data_preprocessed.csv", "../../inst/extdata/desert_data_preprocessed.csv", "./inst/extdata/desert_data_preprocessed.csv", "microcl_ml_corr/inst/extdata/desert_data_preprocessed.csv")) {
+    if (file.exists(path)) {
+      DESERT_PATH <- path
+      break
+    }
+  }
+  SPLITS_PATH  <- ""
+  for (path in c("../../../inst/extdata/desert_splits.csv", "../../inst/extdata/desert_splits.csv", "./inst/extdata/desert_splits.csv", "microcl_ml_corr/inst/extdata/desert_splits.csv")) {
+    if (file.exists(path)) {
+      SPLITS_PATH <- path
+      break
+    }
+  }
+  SCENARIO_DIR <- "."
+  OUTPUT_DIR   <- "./results"
 }
-
-DESERT_PATH  <- file.path(PROJECT_ROOT, "data/experiments_data/desert_data_preprocessed.csv")
-SCENARIO_DIR <- file.path(PROJECT_ROOT, "microcl_ml_corr/inst/examples/scenario_7_desert_specialized")
-OUTPUT_DIR   <- file.path(SCENARIO_DIR, "results")
 SEED         <- 42
 
 dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
@@ -78,7 +106,7 @@ desert_data <- prepare_desert_data(DESERT_PATH)
 
 splits <- load_aligned_splits(
   desert_data,
-  file.path(PROJECT_ROOT, "data/experiments_data/desert_splits.csv"),
+  SPLITS_PATH,
   "site_id"
 )
 features <- get_feature_columns(splits$train)

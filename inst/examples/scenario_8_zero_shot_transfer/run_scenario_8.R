@@ -17,19 +17,47 @@ suppressPackageStartupMessages({
   library(keras3)
 })
 
-PROJECT_ROOT <- "/home/ofir/Dropbox/Antigravity/NichMapR_ml_corr"
-pkg_dir <- file.path(PROJECT_ROOT, "microcl_ml_corr/R")
-if (dir.exists(pkg_dir)) {
-  for (f in list.files(pkg_dir, pattern = "\\.R$", full.names = TRUE)) {
-    source(f, local = FALSE)
-  }
+# Determine project root and source package functions
+pkg_examples_dir <- system.file("examples", package = "microclCorr")
+if (pkg_examples_dir != "") {
+  # Installed package
+  BEACH_PATH   <- system.file("extdata", "Beach_data_preprocessed.csv", package = "microclCorr")
+  SPLITS_PATH  <- system.file("extdata", "beach_splits.csv", package = "microclCorr")
+  SCENARIO_DIR <- system.file("examples", "scenario_8_zero_shot_transfer", package = "microclCorr")
+  OUTPUT_DIR   <- file.path(getwd(), "scenario_8_zero_shot_transfer_results")
 } else {
-  library(microclCorr)
+  # Local development fallback
+  pkg_dir <- ""
+  for (path in c("../../../R", "../../R", "./R", "microcl_ml_corr/R")) {
+    if (dir.exists(path)) {
+      pkg_dir <- path
+      break
+    }
+  }
+  if (pkg_dir != "") {
+    for (f in list.files(pkg_dir, pattern = "\\.R$", full.names = TRUE)) {
+      source(f, local = FALSE)
+    }
+  } else {
+    library(microclCorr)
+  }
+  BEACH_PATH   <- ""
+  for (path in c("../../../inst/extdata/Beach_data_preprocessed.csv", "../../inst/extdata/Beach_data_preprocessed.csv", "./inst/extdata/Beach_data_preprocessed.csv", "microcl_ml_corr/inst/extdata/Beach_data_preprocessed.csv")) {
+    if (file.exists(path)) {
+      BEACH_PATH <- path
+      break
+    }
+  }
+  SPLITS_PATH  <- ""
+  for (path in c("../../../inst/extdata/beach_splits.csv", "../../inst/extdata/beach_splits.csv", "./inst/extdata/beach_splits.csv", "microcl_ml_corr/inst/extdata/beach_splits.csv")) {
+    if (file.exists(path)) {
+      SPLITS_PATH <- path
+      break
+    }
+  }
+  SCENARIO_DIR <- "."
+  OUTPUT_DIR   <- "./results"
 }
-
-BEACH_PATH   <- file.path(PROJECT_ROOT, "data/experiments_data/Beach_data_preprocessed.csv")
-SCENARIO_DIR <- file.path(PROJECT_ROOT, "microcl_ml_corr/inst/examples/scenario_8_zero_shot_transfer")
-OUTPUT_DIR   <- file.path(SCENARIO_DIR, "results")
 SEED         <- 42
 
 dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
@@ -66,7 +94,7 @@ if ("microhabitat_sun" %in% names(beach_data)) beach_data$microhabitat_sun <- NU
 
 splits <- load_aligned_splits(
   beach_data,
-  file.path(PROJECT_ROOT, "data/experiments_data/beach_splits.csv"),
+  SPLITS_PATH,
   "time_series_site"
 )
 features <- get_feature_columns(splits$train)
