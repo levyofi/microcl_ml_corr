@@ -209,36 +209,44 @@ stratified_split_train_val_test <- function(data,
                                             seed = 123) {
 
   df <- data[order(data[[datetime_col]]), , drop = FALSE]
-  dates <- as.Date(df[[datetime_col]], tz = "UTC")
-  day_index <- as.integer(dates - min(dates)) + 1L
-  block <- (day_index - 1L) %/% block_days
 
   set.seed(seed)
-  train_blocks <- c()
-  val_blocks   <- c()
-  test_blocks  <- c()
+  train_rows <- integer(0)
+  val_rows   <- integer(0)
+  test_rows  <- integer(0)
 
   for (strat_val in unique(df[[stratify_col]])) {
-    group_mask <- df[[stratify_col]] == strat_val
-    group_blocks <- unique(block[group_mask])
-    blocks_shuffled <- sample(group_blocks)
+    # Work with row indices into df so sites never contaminate each other
+    group_idx <- which(df[[stratify_col]] == strat_val)
+    group_df  <- df[group_idx, , drop = FALSE]
 
-    n_b <- length(blocks_shuffled)
+    # Blocks relative to this site's own date range
+    dates     <- as.Date(group_df[[datetime_col]], tz = "UTC")
+    day_index <- as.integer(dates - min(dates)) + 1L
+    block     <- (day_index - 1L) %/% block_days
+
+    blocks_shuffled <- sample(unique(block))
+    n_b     <- length(blocks_shuffled)
     n_train <- floor(n_b * train_pct)
     n_val   <- floor(n_b * val_pct)
+    n_test  <- n_b - n_train - n_val
 
-    train_blocks <- c(train_blocks, blocks_shuffled[seq_len(n_train)])
-    val_blocks   <- c(val_blocks, blocks_shuffled[(n_train + 1):(n_train + n_val)])
-    test_blocks  <- c(test_blocks, blocks_shuffled[(n_train + n_val + 1):n_b])
+    tb   <- blocks_shuffled[seq_len(n_train)]
+    vb   <- if (n_val  > 0) blocks_shuffled[seq(n_train + 1,         n_train + n_val)] else integer(0)
+    tesb <- if (n_test > 0) blocks_shuffled[seq(n_train + n_val + 1, n_b            )] else integer(0)
+
+    train_rows <- c(train_rows, group_idx[block %in% tb])
+    val_rows   <- c(val_rows,   group_idx[block %in% vb])
+    test_rows  <- c(test_rows,  group_idx[block %in% tesb])
   }
 
-  train_df <- df[block %in% train_blocks, , drop = FALSE]
-  val_df   <- df[block %in% val_blocks, , drop = FALSE]
-  test_df  <- df[block %in% test_blocks, , drop = FALSE]
+  train_df <- df[train_rows, , drop = FALSE]
+  val_df   <- df[val_rows,   , drop = FALSE]
+  test_df  <- df[test_rows,  , drop = FALSE]
 
   train_df <- train_df[order(train_df[[datetime_col]]), , drop = FALSE]
-  val_df   <- val_df[order(val_df[[datetime_col]]), , drop = FALSE]
-  test_df  <- test_df[order(test_df[[datetime_col]]), , drop = FALSE]
+  val_df   <- val_df[order(val_df[[datetime_col]]),     , drop = FALSE]
+  test_df  <- test_df[order(test_df[[datetime_col]]),   , drop = FALSE]
 
   list(train = train_df, val = val_df, test = test_df)
 }
