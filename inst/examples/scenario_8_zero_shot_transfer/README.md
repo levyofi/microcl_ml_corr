@@ -1,13 +1,12 @@
 # Scenario 8: Zero-Shot Spatial Transfer
 
-A correction model is trained exclusively on data from neighbouring sites
-and applied to a new location where no logger data exists.
-This is the practical deployment scenario: correcting NicheMapR predictions
-at a site before any field measurements have been collected.
+A correction model is trained exclusively on data from neighbouring sites and applied to
+a new location where no logger data exists. Includes a downsampled pooled control to
+separate the effect of training data volume from spatial diversity.
 
-Also includes a scientific control that separates the effect of training data
-volume from spatial diversity, to confirm that performance gains come from
-seeing diverse locations rather than simply from more data.
+**Comparison — Scenario 2 (single logger, Ashkelon 15 m):** RF RMSE = 3.06 °C, 62.6%,
+~1,405 train rows. Note: the "Specialized (Local Data)" condition here uses all Ashkelon
+loggers (~4,631 rows), not just one, so it already has ~3× more data than Scenario 2.
 
 ## Run
 
@@ -19,17 +18,28 @@ source(system.file("examples", "scenario_8_zero_shot_transfer", "run_scenario_8.
 
 | File | Description |
 |------|-------------|
-| `desert_data_preprocessed.csv` | Pre-aligned logger + NicheMapR data for all 48 desert sites |
-| `desert_splits.csv` | Pre-defined train/validation/test block indices |
+| `Beach_data_preprocessed.csv` | Pre-aligned logger + NicheMapR data for all beach sites |
+| `beach_splits.csv` | Pre-defined train/validation/test block indices |
+
+## Sample sizes per strategy (Ashkelon as target example)
+
+| Strategy | Train rows |
+|----------|------------|
+| Zero-Shot (Nearby Sites) | 9,357 |
+| Specialized (Local Data) | 4,631 |
+| Pooled (All Sites) | 13,988 |
+| Pooled (Downsampled to N) | 4,631 |
 
 ## Outputs
 
 | File | Description |
 |------|-------------|
-| `results/` | RMSE and R² for zero-shot transfer vs. local and pooled baselines |
+| `results/zero_shot_results.csv` | RMSE and improvement % per target location and strategy |
+| `scenario_8_report.md` | Full results with key findings |
 
-## Key difference from Scenarios 6 and 7
+## Key result
 
-Scenarios 6 and 7 always include some data from the test site during training.
-This scenario deliberately withholds all data from the target site,
-simulating a true zero-shot transfer to an unseen location.
+Zero-shot transfer achieves 58–68% improvement with no local data at all. The downsampled
+pooled control (same N as local, drawn from other sites) yields 73–84% improvement vs.
+89–92% for local data — confirming that local data is more informative per row than
+data from other sites, even when volume is equalised.

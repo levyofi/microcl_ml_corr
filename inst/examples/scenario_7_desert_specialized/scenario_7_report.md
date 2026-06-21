@@ -2,7 +2,18 @@
 
 Location-specific models are trained on each of the two desert regions (Mishmar, Tzeelim) and tested on local sensor sites, aggregated by microhabitat type.
 
-## 1. Per-Location & Microhabitat Summary
+**Comparison baselines:**
+- Scenario 3 (single loggers): RF RMSE = 1.884 °C, 73.9% improvement, ~448–1,570 train rows per logger.
+- Scenario 6 (pooled, all 48 loggers): RF avg ~1.04 °C, ~87.6% improvement, 118,753 train rows.
+
+## 1. Training Sample Sizes per Region
+
+| Region | Train rows | Validation rows |
+| --- | --- | --- |
+| Mishmar | 81,428 | 16,620 |
+| Tzeelim | 56,668 | 10,528 |
+
+## 2. Per-Location & Microhabitat Summary
 | Location | Microhabitat | Model | Avg Base RMSE (°C) | Avg Corrected RMSE (°C) | Avg Improvement (%) |
 | --- | --- | --- | --- | --- | --- |
 | Mishmar | Bush | LSTM_2h | 8.793 | 1.448 | 83.5% |
@@ -14,6 +25,10 @@ Location-specific models are trained on each of the two desert regions (Mishmar,
 | Tzeelim | Rock | LSTM_2h | 7.733 | 1.155 | 84.9% |
 | Tzeelim | Rock | RF | 7.733 | 0.840 | 89.0% |
 
-## 2. Key Takeaway
-Specialized desert models perform comparably to the pooled model (Scenario 6), with the pooling penalty being effectively zero for RF. This confirms that RF correction is robust to both training strategies in the Judean Desert.
-
+## 3. Key Takeaway
+Specialized RF models (avg ~1.05 °C, ~87.5% improvement) substantially outperform the
+single-logger baseline from Scenario 3 (1.884 °C, 73.9%), but use 56,668–81,428 rows
+vs ~450–1,570 per single logger, making the comparison volume-confounded.
+Performance is virtually identical to the pooled model in Scenario 6 (~1.04 °C avg),
+confirming that region-specific specialisation adds no measurable benefit over the
+fully pooled model for Random Forest correction in the Judean Desert.

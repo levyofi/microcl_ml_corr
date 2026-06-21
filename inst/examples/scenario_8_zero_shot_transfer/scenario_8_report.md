@@ -3,6 +3,11 @@
 ## Motivation
 In practice, users often want to correct NicheMapR predictions at a **new location where no temperature logger has been deployed**. This scenario evaluates whether a Random Forest model trained on data from neighboring sites can provide meaningful correction at an unseen target site.
 
+**Comparison baseline — Scenario 2 (single logger, Ashkelon 15 m only):** RF RMSE = 3.06 °C,
+62.6% improvement, ~1,405 train rows. The "Specialized (Local Data)" condition below uses
+all Ashkelon loggers combined (~4,631 rows), so it already has ~3× more data than the
+Scenario 2 single-logger baseline.
+
 ## Experimental Design
 For each Beach location, we:
 1. **Zero-Shot (Nearby Sites)**: Train RF on data from the other 2 locations only, excluding all target-site data entirely. This simulates deploying a correction model to a new field site.
