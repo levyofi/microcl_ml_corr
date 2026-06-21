@@ -1,394 +1,264 @@
-#!/usr/bin/env Rscript
-# =========================================================================
+# =============================================================================
 # Scenario 1: Mediterranean Valley Habitat (Harod)
-# Microclimate ML Correction Example
-# =========================================================================
+# =============================================================================
+# Goal: Train local correction models for three microhabitats (Sun, Shade, Air)
+#       at the Harod valley site and measure how performance changes with the
+#       amount of training data available.
+#
+# What the pipeline does:
+#   NicheMapR predicts microclimate temperatures but is not perfect.
+#   The gap between the prediction and what a logger measured is the "residual":
+#
+#       residual = measured temperature − NicheMapR prediction
+#
+#   We train a model to predict that residual. The corrected temperature is:
+#
+#       corrected temperature = NicheMapR prediction + predicted residual
+#
+#   Two model types are compared:
+#     • Random Forest (RF) — an ensemble of decision trees, fast and robust.
+#     • LSTM (2 h window) — a neural network that uses the past 2 hours of
+#       measurements to predict the current residual.
+#
+# Learning curves:
+#   We repeat training for 9 different training-set sizes (1 to 42 days) and
+#   5 independent random runs each to show how much data is needed before
+#   accuracy plateaus. Accuracy is measured by RMSE (°C); lower = better.
+# =============================================================================
 
-suppressPackageStartupMessages({
-  library(dplyr)
-  library(ggplot2)
-  library(gridExtra)
-  library(ranger)
-  library(keras3)
-})
+library(microclCorr)
+library(ggplot2)
+library(gridExtra)
 
-# Determine project root and source package functions
-pkg_examples_dir <- system.file("examples", package = "microclCorr")
-if (pkg_examples_dir != "") {
-  # Installed package
-  HAROD_PATH   <- system.file("extdata", "Harod_dataset.csv", package = "microclCorr")
-  SCENARIO_DIR <- system.file("examples", "scenario_1_valley", package = "microclCorr")
-  OUTPUT_DIR   <- file.path(getwd(), "scenario_1_valley_results")
-} else {
-  # Local development fallback
-  pkg_dir <- ""
-  for (path in c("../../../R", "../../R", "./R", "microcl_ml_corr/R")) {
-    if (dir.exists(path)) {
-      pkg_dir <- path
-      break
-    }
-  }
-  if (pkg_dir != "") {
-    for (f in list.files(pkg_dir, pattern = "\\.R$", full.names = TRUE)) {
-      source(f, local = FALSE)
-    }
-  } else {
-    library(microclCorr)
-  }
-  HAROD_PATH   <- ""
-  for (path in c("../../../inst/extdata/Harod_dataset.csv", "../../inst/extdata/Harod_dataset.csv", "./inst/extdata/Harod_dataset.csv", "microcl_ml_corr/inst/extdata/Harod_dataset.csv")) {
-    if (file.exists(path)) {
-      HAROD_PATH <- path
-      break
-    }
-  }
-  SCENARIO_DIR <- "."
-  OUTPUT_DIR   <- "./results"
-}
-SEED         <- 123
-N_RUNS       <- 5
-TRAINING_DAYS <- c(1, 2, 3, 7, 14, 21, 28, 35, 42)
+# ── Settings ──────────────────────────────────────────────────────────────────
+SEED          <- 123
+N_RUNS        <- 5     # repeat each training size 5 times with different random seeds
+TRAINING_DAYS <- c(1, 2, 3, 7, 14, 21, 28, 35, 42)   # training set sizes to test
 
-dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
+DATA_PATH    <- system.file("extdata", "Harod_dataset.csv", package = "microclCorr")
+SCENARIO_DIR <- file.path("inst", "examples", "scenario_1_valley")
+RESULTS_DIR  <- file.path(SCENARIO_DIR, "results")
+dir.create(RESULTS_DIR, showWarnings = FALSE, recursive = TRUE)
 
-# Valley tasks
+# Each "task" is one microhabitat logger at the Harod site.
+# train/val/test_blocks are pre-defined 7-day time blocks assigned to each role.
 tasks <- list(
-  list(
-    name = "harod2_sun", site = "harod2_sun.csv", title = "Valley - Sun",
-    train_blocks = c(0, 1, 2, 3, 4, 7), val_blocks = c(5), test_blocks = c(6)
-  ),
-  list(
-    name = "harod2_shd", site = "harod2_shd.csv", title = "Valley - Shade",
-    train_blocks = c(0, 1, 2, 3, 4, 7), val_blocks = c(5), test_blocks = c(6)
-  ),
-  list(
-    name = "harod2_air", site = "harod2_air.csv", title = "Valley - Air",
-    train_blocks = c(0, 1, 2, 3, 4, 7), val_blocks = c(5), test_blocks = c(6)
-  )
+  list(name = "harod2_sun", site = "harod2_sun.csv", title = "Valley - Sun",
+       train_blocks = c(0,1,2,3,4,7), val_blocks = c(5), test_blocks = c(6)),
+  list(name = "harod2_shd", site = "harod2_shd.csv", title = "Valley - Shade",
+       train_blocks = c(0,1,2,3,4,7), val_blocks = c(5), test_blocks = c(6)),
+  list(name = "harod2_air", site = "harod2_air.csv", title = "Valley - Air",
+       train_blocks = c(0,1,2,3,4,7), val_blocks = c(5), test_blocks = c(6))
 )
 
-# Sourcing helper loaders
-load_valley_data <- function(path, site) {
-  data <- load_prepared_csv_data(
-    path, is_continuous_microhabitat = FALSE,
-    datetime_format = "%d/%m/%Y %H:%M", includes_index = TRUE
-  )
-  data <- data[data$time_series_doc == site, , drop = FALSE]
-  list(data = data, site_col = "time_series_doc")
-}
+cat("=== Scenario 1: Valley Habitat ===\n")
 
-# 1. Run Correction Experiments
-cat("\n=== RUNNING SCENARIO 1 EXPERIMENTS ===\n")
-results_list <- list()
+all_results <- list()
+plot_list   <- list()
 
 for (task in tasks) {
-  out_path <- file.path(OUTPUT_DIR, sprintf("%s_results.csv", task$name))
-  
-  if (file.exists(out_path)) {
-    cat(sprintf("Loading existing results for %s...\n", task$name))
-    results_list[[task$name]] <- read.csv(out_path, stringsAsFactors = FALSE)
-    next
-  }
-  
-  cat(sprintf("\nProcessing Valley Microhabitat: %s\n", task$name))
-  ld <- load_valley_data(HAROD_PATH, task$site)
-  site_data <- ld$data
-  site_name_col <- ld$site_col
-  
-  # Splits & Preprocessing
-  splits <- split_train_val_test(
-    site_data, train_pct = 0.75, val_pct = 0.125,
-    block_days = 7, use_blocks = TRUE, seed = SEED,
-    train_blocks = task$train_blocks,
-    val_blocks = task$val_blocks,
-    test_blocks = task$test_blocks
-  )
-  
-  scaled <- lstm_scaling(splits$train, splits$val, splits$test)
+  cat(sprintf("\n── Microhabitat: %s ──\n", task$name))
+
+  # ── Step 1: Load data ───────────────────────────────────────────────────────
+  # Read the logger data and parse the datetime column.
+  # Rows from other loggers are removed so this task trains only on one site.
+  data     <- load_prepared_csv_data(DATA_PATH,
+                                     is_continuous_microhabitat = FALSE,
+                                     datetime_format = "%d/%m/%Y %H:%M",
+                                     includes_index  = TRUE)
+  data     <- data[data$time_series_doc == task$site, ]
+  site_col <- "time_series_doc"
+
+  # ── Step 2: Split into train / validation / test ────────────────────────────
+  # Rows are assigned to blocks of 7 consecutive days; those blocks are then
+  # allocated to train, val, or test. Using blocks (rather than random rows)
+  # prevents the model from "seeing the future" during training.
+  splits <- split_train_val_test(data,
+                                  train_pct    = 0.75,
+                                  val_pct      = 0.125,
+                                  block_days   = 7,
+                                  use_blocks   = TRUE,
+                                  seed         = SEED,
+                                  train_blocks = task$train_blocks,
+                                  val_blocks   = task$val_blocks,
+                                  test_blocks  = task$test_blocks)
+
+  # ── Step 3: Select predictor columns ────────────────────────────────────────
   feature_cols <- get_feature_columns(splits$train)
-  
-  lstm_data_24h <- lstm_specific_preprocessing(
-    scaled$train, scaled$val, scaled$test,
-    window_size = 24, ts_names_col = site_name_col
-  )
-  
-  rf_test_dataset_aligned <- align_test_sets(
-    splits$test, lstm_data_24h$test_dict,
-    lstm_data_24h$index_info, site_name_col
-  )
-  
-  rf_train_X <- splits$train[, feature_cols, drop = FALSE]
-  rf_train_y <- splits$train$residual
-  rf_val_X   <- splits$val[, feature_cols, drop = FALSE]
-  rf_val_y   <- splits$val$residual
-  rf_test_X  <- rf_test_dataset_aligned[, feature_cols, drop = FALSE]
-  rf_test_y  <- rf_test_dataset_aligned$residual
-  rf_test_base <- rf_test_dataset_aligned$predicted
-  
-  # Hyperparameter tuning
-  cat("  Tuning Random Forest...\n")
-  rf_full <- train_rf(rf_train_X, rf_train_y, tune = TRUE,
-                      n_combinations = 5, val_X = rf_val_X, val_y = rf_val_y,
-                      seed = SEED)
-  rf_params <- list(max.depth = rf_full$max.depth,
-                    min.node.size = rf_full$min.node.size,
-                    mtry = rf_full$mtry)
-  
-  cat("  Tuning LSTM 2h...\n")
-  lstm_data_2h <- lstm_specific_preprocessing(
-    scaled$train, scaled$val, scaled$test,
-    window_size = 2, ts_names_col = site_name_col
-  )
-  hpo <- lstm_hypertuning(
-    lstm_data_2h$train_dict$X, lstm_data_2h$train_dict$y,
-    lstm_data_2h$val_dict$X, lstm_data_2h$val_dict$y,
-    n_trials = 3, epochs = 40, batch_size = 32, patience = 5, seed = SEED
-  )
-  bp <- hpo$params
-  
-  X_test_aligned <- lstm_data_24h$test_dict$X[, (24 - 2 + 1):24, , drop = FALSE]
-  y_test_aligned <- lstm_data_24h$test_dict$y
-  base_test_aligned <- lstm_data_24h$test_dict$base_pred
-  
+
+  # ── Step 4 (LSTM prep): Normalise and create time windows ───────────────────
+  # Scale all values to 0–1 using training statistics only (no data leakage).
+  scaled  <- lstm_scaling(splits$train, splits$val, splits$test)
+
+  # Create overlapping 2-hour windows — used for the learning curve and final plots.
+  # Also create 24-hour windows — used only to align the test set (see Step 6).
+  lstm_2h  <- lstm_specific_preprocessing(scaled$train, scaled$val, scaled$test,
+                                           window_size = 2,  ts_names_col = site_col)
+  lstm_24h <- lstm_specific_preprocessing(scaled$train, scaled$val, scaled$test,
+                                           window_size = 24, ts_names_col = site_col)
+
+  # ── Step 6: Align the RF and LSTM test sets ──────────────────────────────────
+  # The LSTM predicts only at the end of each window. This step trims the RF
+  # test set to those same rows so both models are evaluated on identical data.
+  rf_test        <- align_test_sets(splits$test, lstm_24h$test_dict,
+                                    lstm_24h$index_info, site_col)
+  X_test_2h      <- lstm_24h$test_dict$X[, 23:24, , drop = FALSE]  # last 2 hours of each 24h window
+  y_test_lstm    <- lstm_24h$test_dict$y
+  base_test_lstm <- lstm_24h$test_dict$base_pred   # NicheMapR values (unscaled)
+
+  # ── Tune hyperparameters once using the FULL training set ───────────────────
+  # RF: search over combinations of tree depth, node size, and number of features.
+  cat("  Tuning RF hyperparameters...\n")
+  rf_tuned  <- train_rf(splits$train[, feature_cols], splits$train$residual,
+                         tune = TRUE, n_combinations = 5,
+                         val_X = splits$val[, feature_cols],
+                         val_y = splits$val$residual,
+                         seed  = SEED)
+  rf_params <- list(max.depth     = rf_tuned$max.depth,
+                     min.node.size = rf_tuned$min.node.size,
+                     mtry          = rf_tuned$mtry)
+
+  # LSTM: search over network size, dropout, and learning rate combinations.
+  cat("  Tuning LSTM hyperparameters...\n")
+  hpo         <- lstm_hypertuning(lstm_2h$train_dict$X, lstm_2h$train_dict$y,
+                                   lstm_2h$val_dict$X,   lstm_2h$val_dict$y,
+                                   n_trials   = 3,
+                                   epochs     = 40,
+                                   batch_size = 32,
+                                   patience   = 5,
+                                   seed       = SEED)
+  lstm_params <- hpo$params   # best found configuration
+
+  # ── Learning curve: train on progressively more data and record accuracy ─────
+  # The training rows are sorted by time so that "n days" always means
+  # the FIRST n days of available data (simulating real deployment).
+  train_sorted <- splits$train[order(splits$train$time), ]
   task_results <- list()
-  
+
   for (n_days in TRAINING_DAYS) {
-    n_hours <- n_days * 24
-    
-    # Random Forest partial train
-    ts_sites <- unique(splits$train[[site_name_col]])
-    partial_rows <- list()
-    for (ts in ts_sites) {
-      ts_d <- splits$train[splits$train[[site_name_col]] == ts, , drop = FALSE]
-      ts_d <- ts_d[order(ts_d$time), , drop = FALSE]
-      k <- min(nrow(ts_d), n_hours)
-      partial_rows[[length(partial_rows) + 1]] <- ts_d[seq_len(k), , drop = FALSE]
-    }
-    rf_partial <- do.call(rbind, partial_rows)
-    rf_train_size <- nrow(rf_partial)
-    
-    if (rf_train_size > 0) {
-      for (run_id in 0:(N_RUNS - 1)) {
-        rf_m <- ranger::ranger(
-          x = rf_partial[, feature_cols, drop = FALSE], y = rf_partial$residual,
-          num.trees = 500, max.depth = rf_params$max.depth,
-          min.node.size = rf_params$min.node.size, mtry = rf_params$mtry, seed = run_id
-        )
-        metrics <- evaluate_correction(rf_m, rf_test_X, rf_test_y, rf_test_base, model_type = "rf")
-        task_results[[length(task_results) + 1]] <- data.frame(
-          model = "RF", perc = n_days, train_size = rf_train_size,
-          ts_name = "ALL", rmse_corr = metrics$rmse_corr, rmse_base = metrics$rmse_base,
-          run = run_id, stringsAsFactors = FALSE
-        )
-      }
-    }
-    
-    # LSTM partial train
-    total_train <- length(lstm_data_2h$train_dict$y)
-    k_lstm <- min(total_train, n_hours)
-    
-    if (k_lstm > 0) {
-      train_idx <- seq_len(k_lstm)
-      X_partial <- lstm_data_2h$train_dict$X[train_idx, , , drop = FALSE]
-      y_partial <- lstm_data_2h$train_dict$y[train_idx]
-      
-      for (run_id in 0:(N_RUNS - 1)) {
-        model <- train_lstm(
-          X_partial, y_partial, lstm_data_2h$val_dict$X, lstm_data_2h$val_dict$y,
-          n_units = bp$n_units, n_layers = bp$n_layers, dropout = bp$dropout, lr = bp$lr,
-          epochs = 40, batch_size = 32, patience = 5, seed = run_id
-        )
-        metrics <- evaluate_correction(model, X_test_aligned, y_test_aligned, base_test_aligned, model_type = "lstm")
-        task_results[[length(task_results) + 1]] <- data.frame(
-          model = "LSTM_2h", perc = n_days, train_size = k_lstm,
-          ts_name = "ALL", rmse_corr = metrics$rmse_corr, rmse_base = metrics$rmse_base,
-          run = run_id, stringsAsFactors = FALSE
-        )
-      }
+    n_hours    <- n_days * 24
+    # Take the first n_hours rows of training data
+    rf_partial <- train_sorted[seq_len(min(nrow(train_sorted), n_hours)), ]
+    lstm_n     <- min(length(lstm_2h$train_dict$y), n_hours)
+    X_partial  <- lstm_2h$train_dict$X[seq_len(lstm_n), , , drop = FALSE]
+    y_partial  <- lstm_2h$train_dict$y[seq_len(lstm_n)]
+
+    for (run in 0:(N_RUNS - 1)) {
+      # RF: train with tuned params, different seed per run
+      rf_m  <- train_rf(rf_partial[, feature_cols], rf_partial$residual,
+                         max.depth     = rf_params$max.depth,
+                         min.node.size = rf_params$min.node.size,
+                         mtry          = rf_params$mtry,
+                         seed          = run)
+      m_rf  <- evaluate_correction(rf_m, rf_test[, feature_cols],
+                                    rf_test$residual, rf_test$predicted,
+                                    model_type = "rf")
+      task_results[[length(task_results) + 1]] <- data.frame(
+        model = "RF", n_days = n_days, run = run,
+        rmse_base = m_rf$rmse_base, rmse_corr = m_rf$rmse_corr)
+
+      # LSTM: train with tuned params, different seed per run
+      lstm_m <- train_lstm(X_partial, y_partial,
+                            lstm_2h$val_dict$X, lstm_2h$val_dict$y,
+                            n_units    = lstm_params$n_units,
+                            n_layers   = lstm_params$n_layers,
+                            dropout    = lstm_params$dropout,
+                            lr         = lstm_params$lr,
+                            epochs     = 40,
+                            batch_size = 32,
+                            patience   = 5,
+                            seed       = run)
+      m_lstm <- evaluate_correction(lstm_m, X_test_2h, y_test_lstm, base_test_lstm,
+                                     model_type = "lstm")
+      task_results[[length(task_results) + 1]] <- data.frame(
+        model = "LSTM_2h", n_days = n_days, run = run,
+        rmse_base = m_lstm$rmse_base, rmse_corr = m_lstm$rmse_corr)
     }
   }
-  
-  results_df <- do.call(rbind, task_results)
-  write.csv(results_df, out_path, row.names = FALSE)
-  results_list[[task$name]] <- results_df
-}
 
-# Combine results
-all_results <- do.call(rbind, results_list)
-all_results$improvement_pct <- (all_results$rmse_base - all_results$rmse_corr) / all_results$rmse_base * 100
+  task_df <- do.call(rbind, task_results)
+  task_df$improvement_pct <- (task_df$rmse_base - task_df$rmse_corr) /
+                              task_df$rmse_base * 100
+  write.csv(task_df, file.path(RESULTS_DIR, paste0(task$name, "_results.csv")),
+            row.names = FALSE)
+  all_results[[task$name]] <- task_df
 
-# 2. Generate Prediction Example Plots (5 days / 120 hours)
-cat("\nGenerating prediction example plots...\n")
-plot_list <- list()
+  # ── Step 8: Save the full (42-day) model ────────────────────────────────────
+  save_correction_model(rf_tuned, scaler = NULL, feature_cols = feature_cols,
+                         path = file.path(RESULTS_DIR, paste0(task$name, "_rf_model.rds")))
 
-for (task in tasks) {
-  ld <- load_valley_data(HAROD_PATH, task$site)
-  site_data <- ld$data
-  site_name_col <- ld$site_col
-  
-  splits <- split_train_val_test(
-    site_data, train_pct = 0.75, val_pct = 0.125,
-    block_days = 7, use_blocks = TRUE, seed = SEED,
-    train_blocks = task$train_blocks, val_blocks = task$val_blocks, test_blocks = task$test_blocks
-  )
-  
-  scaled <- lstm_scaling(splits$train, splits$val, splits$test)
-  feature_cols <- get_feature_columns(splits$train)
-  
-  lstm_data_24h <- lstm_specific_preprocessing(
-    scaled$train, scaled$val, scaled$test,
-    window_size = 24, ts_names_col = site_name_col
-  )
-  
-  rf_test_dataset_aligned <- align_test_sets(
-    splits$test, lstm_data_24h$test_dict,
-    lstm_data_24h$index_info, site_name_col
-  )
-  
-  rf_train_X <- splits$train[, feature_cols, drop = FALSE]
-  rf_train_y <- splits$train$residual
-  rf_test_X  <- rf_test_dataset_aligned[, feature_cols, drop = FALSE]
-  rf_test_base <- rf_test_dataset_aligned$predicted
-  
-  # RF model
-  rf_m <- ranger::ranger(x = rf_train_X, y = rf_train_y, num.trees = 500, seed = SEED)
-  rf_preds <- rf_test_base + predict(rf_m, data = rf_test_X)$predictions
-  
-  # LSTM model
-  lstm_data_2h <- lstm_specific_preprocessing(
-    scaled$train, scaled$val, scaled$test,
-    window_size = 2, ts_names_col = site_name_col
-  )
-  model <- train_lstm(
-    lstm_data_2h$train_dict$X, lstm_data_2h$train_dict$y,
-    lstm_data_2h$val_dict$X, lstm_data_2h$val_dict$y,
-    n_units = 64, n_layers = 2, dropout = 0.2, lr = 0.001,
-    epochs = 20, batch_size = 32, patience = 3, seed = SEED
-  )
-  X_test_aligned <- lstm_data_24h$test_dict$X[, (24 - 2 + 1):24, , drop = FALSE]
-  lstm_preds <- lstm_data_24h$test_dict$base_pred + predict(model, X_test_aligned, verbose = 0)[, 1]
-  
-  plot_df <- data.frame(
-    time = rf_test_dataset_aligned$time,
-    measured = rf_test_dataset_aligned$predicted + rf_test_dataset_aligned$residual,
-    base = rf_test_base,
-    rf = rf_preds,
-    lstm = lstm_preds
-  ) %>% arrange(time) %>% head(120)
-  
-  p <- ggplot(plot_df, aes(x = time)) +
-    geom_line(aes(y = measured, color = "Observed"), linewidth = 1.0) +
-    geom_line(aes(y = base, color = "NicheMapR"), linetype = "dashed", linewidth = 0.8) +
-    geom_line(aes(y = lstm, color = "LSTM Corrected"), linewidth = 0.9) +
-    geom_line(aes(y = rf, color = "RF Corrected"), linetype = "dotted", linewidth = 0.9) +
-    scale_color_manual(
-      values = c("Observed" = "#111111", "NicheMapR" = "#ef4444", 
-                 "LSTM Corrected" = "#3b82f6", "RF Corrected" = "#10b981")
-    ) +
+  # ── Prediction plot: show observed vs NicheMapR vs corrected (first 120 h) ──
+  rf_preds   <- rf_test$predicted + predict(rf_tuned,
+                  data = rf_test[, feature_cols])$predictions
+
+  # Train one LSTM with full data for the prediction plot
+  lstm_full  <- train_lstm(lstm_2h$train_dict$X, lstm_2h$train_dict$y,
+                            lstm_2h$val_dict$X,   lstm_2h$val_dict$y,
+                            n_units    = lstm_params$n_units,
+                            n_layers   = lstm_params$n_layers,
+                            dropout    = lstm_params$dropout,
+                            lr         = lstm_params$lr,
+                            epochs     = 40, batch_size = 32, patience = 5,
+                            seed       = SEED)
+  lstm_preds <- base_test_lstm + predict(lstm_full, X_test_2h, verbose = 0)[, 1]
+
+  plot_df <- head(data.frame(
+    time     = rf_test$time,
+    measured = rf_test$predicted + rf_test$residual,   # actual logger reading
+    base     = rf_test$predicted,                       # NicheMapR (uncorrected)
+    rf       = rf_preds,
+    lstm     = lstm_preds
+  )[order(rf_test$time), ], 120)
+
+  plot_list[[task$name]] <- ggplot(plot_df, aes(x = time)) +
+    geom_line(aes(y = measured, color = "Observed"),       linewidth = 1.0) +
+    geom_line(aes(y = base,     color = "NicheMapR"),      linetype = "dashed",  linewidth = 0.8) +
+    geom_line(aes(y = lstm,     color = "LSTM Corrected"), linewidth = 0.9) +
+    geom_line(aes(y = rf,       color = "RF Corrected"),   linetype = "dotted",  linewidth = 0.9) +
+    scale_color_manual(values = c("Observed" = "#111111", "NicheMapR" = "#ef4444",
+                                   "LSTM Corrected" = "#3b82f6", "RF Corrected" = "#10b981")) +
     labs(title = task$title, x = NULL, y = "Temperature (°C)", color = NULL) +
     theme_minimal(base_size = 10) +
-    theme(
-      plot.title = element_text(face = "bold", size = 11, hjust = 0.5),
-      legend.position = "none",
-      panel.grid.minor = element_blank(),
-      panel.grid.major = element_line(color = "#e5e7eb", linetype = "dotted")
-    )
-  
-  plot_list[[task$name]] <- p
+    theme(plot.title       = element_text(face = "bold", hjust = 0.5),
+          legend.position  = if (task$name == tasks[[1]]$name) "top" else "none",
+          panel.grid.minor = element_blank())
 }
-plot_list[[1]] <- plot_list[[1]] + theme(legend.position = "top")
 
-g_pred <- grid.arrange(grobs = plot_list, ncol = 3)
-ggsave(file.path(SCENARIO_DIR, "prediction_examples_valley.png"), g_pred, width = 15, height = 5, dpi = 300)
+# ── Learning curve plot ────────────────────────────────────────────────────────
+# Average RMSE across microhabitats and runs at each training size.
+# The ribbon shows ±1 standard deviation across the N_RUNS repetitions.
+# The red dashed line is the uncorrected NicheMapR baseline.
+all_df  <- do.call(rbind, all_results)
+lc_summ <- aggregate(cbind(rmse_corr, rmse_base) ~ model + n_days, all_df, mean)
+lc_sd   <- aggregate(rmse_corr ~ model + n_days, all_df, sd)
+lc_summ$sd_corr <- lc_sd$rmse_corr
 
-# 3. Generate Learning Curves
-cat("Generating learning curves...\n")
-summary_perc <- all_results %>%
-  group_by(model, perc) %>%
-  summarize(
-    mean_rmse = mean(rmse_corr),
-    sd_rmse = sd(rmse_corr),
-    .groups = "drop"
-  )
-
-baseline_rmse <- mean(all_results$rmse_base)
-
-p_lc <- ggplot(summary_perc, aes(x = perc, y = mean_rmse, color = model, fill = model)) +
+p_lc <- ggplot(lc_summ, aes(x = n_days, y = rmse_corr, color = model, fill = model)) +
+  geom_ribbon(aes(ymin = rmse_corr - sd_corr, ymax = rmse_corr + sd_corr),
+              alpha = 0.15, color = NA) +
   geom_line(linewidth = 1.0) +
   geom_point(size = 1.5) +
-  geom_ribbon(aes(ymin = mean_rmse - sd_rmse, ymax = mean_rmse + sd_rmse), alpha = 0.15, color = NA) +
-  geom_hline(yintercept = baseline_rmse, color = "#ef4444", linetype = "dashed", linewidth = 0.8) +
-  scale_color_manual(values = c("LSTM_2h" = "#3b82f6", "RF" = "#10b981"), labels = c("LSTM (2h)", "Random Forest")) +
-  scale_fill_manual(values = c("LSTM_2h" = "#3b82f6", "RF" = "#10b981"), labels = c("LSTM (2h)", "Random Forest")) +
+  geom_hline(yintercept = mean(lc_summ$rmse_base), color = "#ef4444",
+             linetype = "dashed", linewidth = 0.8) +
+  scale_color_manual(values = c("LSTM_2h" = "#3b82f6", "RF" = "#10b981"),
+                     labels = c("LSTM (2h)", "Random Forest")) +
+  scale_fill_manual(values  = c("LSTM_2h" = "#3b82f6", "RF" = "#10b981"),
+                    labels  = c("LSTM (2h)", "Random Forest")) +
   scale_x_continuous(breaks = TRAINING_DAYS) +
-  labs(
-    title = "Learning Curves: Valley Habitat (Harod)",
-    x = "Training Data Size (Days)",
-    y = "Correction Error (Test RMSE °C)",
-    color = "Model",
-    fill = "Model"
-  ) +
+  labs(title = "Learning Curves: Valley Habitat (Harod)",
+       x     = "Training Data Size (Days)",
+       y     = "Test RMSE (°C)  — lower is better",
+       color = "Model", fill = "Model") +
   theme_minimal(base_size = 11) +
-  theme(
-    plot.title = element_text(face = "bold", size = 12, hjust = 0.5),
-    legend.position = "bottom",
-    panel.grid.minor = element_blank(),
-    panel.grid.major = element_line(color = "#e5e7eb", linetype = "dotted")
-  )
-ggsave(file.path(SCENARIO_DIR, "learning_curves_valley.png"), p_lc, width = 8, height = 4.5, dpi = 300)
+  theme(plot.title = element_text(face = "bold", hjust = 0.5),
+        legend.position = "bottom", panel.grid.minor = element_blank())
 
-# 4. Generate Markdown Report
-cat("Generating scenario report...\n")
-df_42 <- all_results %>% filter(perc == 42)
-summary_table <- df_42 %>%
-  group_by(name = gsub("harod2_", "", ts_name), model) %>%
-  summarize(
-    mean_rmse_corr = mean(rmse_corr),
-    mean_improvement_pct = mean(improvement_pct),
-    mean_rmse_base = mean(rmse_base),
-    .groups = "drop"
-  )
+ggsave(file.path(SCENARIO_DIR, "learning_curves_valley.png"),
+       p_lc, width = 8, height = 4.5, dpi = 300)
+ggsave(file.path(SCENARIO_DIR, "prediction_examples_valley.png"),
+       grid.arrange(grobs = plot_list, ncol = 3), width = 15, height = 5, dpi = 300)
 
-# Simple wide formatting for printout
-pivot_rmse <- summary_table %>%
-  tidyr::pivot_wider(id_cols = c(name, mean_rmse_base), 
-                     names_from = model, 
-                     values_from = c(mean_rmse_corr, mean_improvement_pct))
-
-markdown_table <- "| Microhabitat | Baseline NicheMapR RMSE (°C) | LSTM (2h) RMSE (°C) | LSTM (2h) Imp (%) | RF RMSE (°C) | RF Imp (%) |\n"
-markdown_table <- paste0(markdown_table, "| --- | --- | --- | --- | --- | --- |\n")
-for (i in seq_len(nrow(pivot_rmse))) {
-  row <- pivot_rmse[i, ]
-  markdown_table <- paste0(markdown_table, sprintf(
-    "| %s | %.3f | %.3f | %.1f%% | %.3f | %.1f%% |\n",
-    row$name, row$mean_rmse_base,
-    row$mean_rmse_corr_LSTM_2h, row$mean_improvement_pct_LSTM_2h,
-    row$mean_rmse_corr_RF, row$mean_improvement_pct_RF
-  ))
-}
-
-report_content <- paste0(
-"# Scenario 1: Mediterranean Valley Habitat (Harod) Report
-
-This example demonstrates local logger microclimate correction in a Mediterranean Valley habitat using physical model baselines (NicheMapR) coupled with Random Forest (`ranger`) and sequential LSTM (`keras3`) models.
-
-## 1. Example Predictions (120 Hours)
-The following plot shows the test set ground truth (Observed) vs. NicheMapR physical simulation, compared to machine learning corrected outputs:
-
-![Valley predictions example](prediction_examples_valley.png)
-
-## 2. Performance Comparison Table
-Below is the test set correction performance when trained on the full 42 days of available training data:
-
-", markdown_table, "
-
-## 3. Learning Curves (Training Size Optimization)
-We analyzed how training data volume impacts performance:
-
-![Valley learning curves](learning_curves_valley.png)
-
-* **Key Takeaway**: A training size of **28 days** recovers >90% of the maximum improvement. The plateau is due to the chronological size constraints of the block splits.
-")
-
-writeLines(report_content, file.path(SCENARIO_DIR, "scenario_1_report.md"))
-cat("\n=== Scenario 1 Run Finished Successfully ===\n")
+cat("\nPerformance at 42 days of training data:\n")
+print(aggregate(cbind(rmse_base, rmse_corr, improvement_pct) ~ model,
+                all_df[all_df$n_days == 42, ], mean))
+cat("=== Scenario 1 complete ===\n")

@@ -1,186 +1,110 @@
-#!/usr/bin/env Rscript
-# =========================================================================
-# Scenario 5: Beach Habitat — Specialized (Location-Specific) Models (Phase 2)
-# Separate models are trained per coastal location (Ashkelon, Range 24,
-# Rosh HaNikra) and tested on local sensor sites.
-# =========================================================================
+# =============================================================================
+# Scenario 5: Beach Habitat — Specialized (Location-Specific) Models
+# =============================================================================
+# Goal: Train a SEPARATE model for each coastal location (Ashkelon, Range_24,
+#       Rosh_HaNikra) and test whether this beats the single pooled model
+#       from Scenario 4.
+#
+# The same pipeline is run three times — once per location. Each model only
+# sees data from its own location during training, so it can specialise to
+# local conditions (wind patterns, sea proximity, terrain).
+#
+# Compare with: Scenario 2 (single logger), Scenario 4 (all sites pooled)
+# =============================================================================
 
-suppressPackageStartupMessages({
-  library(dplyr)
-  library(ggplot2)
-  library(ranger)
-  library(keras3)
-})
+library(microclCorr)
+source(system.file("examples", "utils.R", package = "microclCorr"))
 
-# Determine project root and source package functions
-pkg_examples_dir <- system.file("examples", package = "microclCorr")
-if (pkg_examples_dir != "") {
-  # Installed package
-  BEACH_PATH   <- system.file("extdata", "Beach_data_preprocessed.csv", package = "microclCorr")
-  SPLITS_PATH  <- system.file("extdata", "beach_splits.csv", package = "microclCorr")
-  SCENARIO_DIR <- system.file("examples", "scenario_5_beach_specialized", package = "microclCorr")
-  OUTPUT_DIR   <- file.path(getwd(), "scenario_5_beach_specialized_results")
-} else {
-  # Local development fallback
-  pkg_dir <- ""
-  for (path in c("../../../R", "../../R", "./R", "microcl_ml_corr/R")) {
-    if (dir.exists(path)) {
-      pkg_dir <- path
-      break
-    }
-  }
-  if (pkg_dir != "") {
-    for (f in list.files(pkg_dir, pattern = "\\.R$", full.names = TRUE)) {
-      source(f, local = FALSE)
-    }
-  } else {
-    library(microclCorr)
-  }
-  BEACH_PATH   <- ""
-  for (path in c("../../../inst/extdata/Beach_data_preprocessed.csv", "../../inst/extdata/Beach_data_preprocessed.csv", "./inst/extdata/Beach_data_preprocessed.csv", "microcl_ml_corr/inst/extdata/Beach_data_preprocessed.csv")) {
-    if (file.exists(path)) {
-      BEACH_PATH <- path
-      break
-    }
-  }
-  SPLITS_PATH  <- ""
-  for (path in c("../../../inst/extdata/beach_splits.csv", "../../inst/extdata/beach_splits.csv", "./inst/extdata/beach_splits.csv", "microcl_ml_corr/inst/extdata/beach_splits.csv")) {
-    if (file.exists(path)) {
-      SPLITS_PATH <- path
-      break
-    }
-  }
-  SCENARIO_DIR <- "."
-  OUTPUT_DIR   <- "./results"
-}
-SEED         <- 42
+# ── Settings ──────────────────────────────────────────────────────────────────
+SEED        <- 42
+SITE_COL    <- "time_series_site"
 
-dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
+DATA_PATH   <- system.file("extdata", "Beach_data_preprocessed.csv", package = "microclCorr")
+SPLITS_PATH <- system.file("extdata", "beach_splits.csv",            package = "microclCorr")
+RESULTS_DIR <- file.path("inst", "examples", "scenario_5_beach_specialized", "results")
+dir.create(RESULTS_DIR, showWarnings = FALSE, recursive = TRUE)
 
-# Helper: load aligned splits
-load_aligned_splits <- function(data, split_csv_path, site_col, datetime_col = "time") {
-  splits_df <- read.csv(split_csv_path, stringsAsFactors = FALSE)
-  data$time_str <- format(data[[datetime_col]], "%Y-%m-%d %H:%M:%S", tz = "UTC")
-  splits_df$time_str <- format(as.POSIXct(splits_df$time, format = "%Y-%m-%d %H:%M:%S", tz = "UTC"),
-                               "%Y-%m-%d %H:%M:%S", tz = "UTC")
-  splits_df <- splits_df[, c("time_str", site_col, "split"), drop = FALSE]
-  merged <- merge(data, splits_df, by = c("time_str", site_col), all.x = TRUE)
-  merged <- merged[order(merged[[datetime_col]]), ]
-  train_df <- merged[merged$split == "train" & !is.na(merged$split), ]
-  val_df   <- merged[merged$split == "val"   & !is.na(merged$split), ]
-  test_df  <- merged[merged$split == "test"  & !is.na(merged$split), ]
-  for (df_name in c("train_df", "val_df", "test_df")) {
-    d <- get(df_name); d$time_str <- NULL; d$split <- NULL; assign(df_name, d)
-  }
-  list(train = train_df, val = val_df, test = test_df)
-}
+cat("=== Scenario 5: Beach Specialized ===\n")
 
-# =========================================================================
-# 1. Load Beach Data & Splits
-# =========================================================================
-cat("\n=== SCENARIO 5: BEACH SPECIALIZED MODELS ===\n")
-beach_data <- load_prepared_csv_data(
-  BEACH_PATH, is_continuous_microhabitat = FALSE,
-  datetime_format = "%Y-%m-%d %H:%M:%S", includes_index = TRUE
-)
-if ("microhabitat_sun" %in% names(beach_data)) beach_data$microhabitat_sun <- NULL
+# ── Step 1: Load data ─────────────────────────────────────────────────────────
+# Same loading step as Scenario 4 — all beach loggers in one file.
+data <- load_prepared_csv_data(DATA_PATH,
+                               is_continuous_microhabitat = FALSE,
+                               datetime_format = "%Y-%m-%d %H:%M:%S",
+                               includes_index  = TRUE)
+if ("microhabitat_sun" %in% names(data)) data$microhabitat_sun <- NULL
 
-splits <- load_aligned_splits(
-  beach_data,
-  SPLITS_PATH,
-  "time_series_site"
-)
-features <- get_feature_columns(splits$train)
+# ── Step 2: Split into train / validation / test ───────────────────────────────
+# Use the SAME pre-defined time blocks as Scenario 4 so that both scenarios
+# are evaluated on identical test rows — enabling a fair comparison.
+splits <- load_splits_from_csv(data, SPLITS_PATH, SITE_COL)
 
-# =========================================================================
-# 2. Loop Over Beach Locations
-# =========================================================================
-beach_locations <- c("Ashkelon", "Range_24", "Rosh_HaNikra")
+# ── Step 3: Select predictor columns ──────────────────────────────────────────
+feature_cols <- get_feature_columns(splits$train)
+
+# ── Steps 4–7: Run the full pipeline once per location ────────────────────────
+# For each coastal location we subset the data, train both models, and evaluate.
 results <- list()
 
-for (loc in beach_locations) {
-  cat(sprintf("\n--- Training Specialized models for: %s ---\n", loc))
+for (loc in c("Ashkelon", "Range_24", "Rosh_HaNikra")) {
+  cat(sprintf("\n── Location: %s ──\n", loc))
 
-  train_sub <- splits$train[splits$train$location == loc, ]
-  val_sub   <- splits$val[splits$val$location == loc, ]
-  test_sub  <- splits$test[splits$test$location == loc, ]
-  cat(sprintf("  Train: %d | Val: %d | Test: %d rows\n", nrow(train_sub), nrow(val_sub), nrow(test_sub)))
+  # Subset to this location only
+  train_loc <- splits$train[splits$train$location == loc, ]
+  val_loc   <- splits$val  [splits$val$location   == loc, ]
+  test_loc  <- splits$test [splits$test$location  == loc, ]
+  cat(sprintf("Train: %d | Validation: %d | Test: %d rows\n",
+              nrow(train_loc), nrow(val_loc), nrow(test_loc)))
 
-  # ----- Specialized RF -----
-  rf_spec <- ranger::ranger(
-    x = train_sub[, features, drop = FALSE],
-    y = train_sub$residual, num.trees = 500, seed = SEED
-  )
+  # Step 4: Train a Random Forest on this location's data only
+  rf_model <- train_rf(train_loc[, feature_cols], train_loc$residual, seed = SEED)
 
-  # ----- Specialized LSTM -----
-  scaled_sub <- lstm_scaling(train_sub, val_sub, test_sub)
-  lstm_sub   <- lstm_specific_preprocessing(scaled_sub$train, scaled_sub$val, scaled_sub$test,
-                                             window_size = 2, ts_names_col = "time_series_site")
-  rf_test_sub <- align_test_sets(test_sub, lstm_sub$test_dict, lstm_sub$index_info, "time_series_site")
+  # Step 5: Train an LSTM on this location's data only
+  scaled    <- lstm_scaling(train_loc, val_loc, test_loc)
+  lstm_data <- lstm_specific_preprocessing(scaled$train, scaled$val, scaled$test,
+                                            window_size  = 2,
+                                            ts_names_col = SITE_COL)
+  lstm_model <- train_lstm(lstm_data$train_dict$X, lstm_data$train_dict$y,
+                            lstm_data$val_dict$X,   lstm_data$val_dict$y,
+                            n_units = 32, n_layers = 1, dropout = 0.0, lr = 0.005,
+                            epochs = 40, batch_size = 128, patience = 5, seed = SEED)
 
-  lstm_spec <- train_lstm(
-    lstm_sub$train_dict$X, lstm_sub$train_dict$y,
-    lstm_sub$val_dict$X,   lstm_sub$val_dict$y,
-    n_units = 32, n_layers = 1, dropout = 0.0, lr = 0.005,
-    epochs = 40, batch_size = 128, patience = 5, seed = SEED
-  )
+  # Step 6: Align test sets (keep only rows where the LSTM made a prediction)
+  rf_test <- align_test_sets(test_loc, lstm_data$test_dict, lstm_data$index_info, SITE_COL)
 
-  # Evaluate RF on each sub-site
-  for (ts_site in unique(rf_test_sub$time_series_site)) {
-    mask <- rf_test_sub$time_series_site == ts_site
-    m <- evaluate_correction(rf_spec,
-      rf_test_sub[mask, features, drop = FALSE],
-      rf_test_sub$residual[mask],
-      rf_test_sub$predicted[mask], model_type = "rf")
-    results[[length(results) + 1]] <- data.frame(
-      location = loc, model = "RF", ts_name = ts_site,
-      rmse_corr = m$rmse_corr, rmse_base = m$rmse_base, stringsAsFactors = FALSE)
+  # Step 7: Evaluate, recording results per logger site within this location
+  for (site in unique(rf_test[[SITE_COL]])) {
+    mask <- rf_test[[SITE_COL]] == site
+    m    <- evaluate_correction(rf_model, rf_test[mask, feature_cols],
+                                 rf_test$residual[mask], rf_test$predicted[mask],
+                                 model_type = "rf")
+    results[[length(results) + 1]] <- c(results_row("RF", site, m), list(location = loc))
   }
 
-  # Evaluate LSTM on each sub-site
-  for (i in seq_along(lstm_sub$index_info$datasets)) {
-    ts_site <- lstm_sub$index_info$datasets[i]
-    idx     <- lstm_sub$index_info$test_indices[[i]] + 1
-    m <- evaluate_correction(lstm_spec,
-      lstm_sub$test_dict$X[idx, , , drop = FALSE],
-      lstm_sub$test_dict$y[idx],
-      lstm_sub$test_dict$base_pred[idx], model_type = "lstm")
-    results[[length(results) + 1]] <- data.frame(
-      location = loc, model = "LSTM_2h", ts_name = ts_site,
-      rmse_corr = m$rmse_corr, rmse_base = m$rmse_base, stringsAsFactors = FALSE)
+  for (i in seq_along(lstm_data$index_info$datasets)) {
+    site <- lstm_data$index_info$datasets[i]
+    idx  <- lstm_data$index_info$test_indices[[i]] + 1
+    m    <- evaluate_correction(lstm_model,
+                                 lstm_data$test_dict$X[idx, , , drop = FALSE],
+                                 lstm_data$test_dict$y[idx],
+                                 lstm_data$test_dict$base_pred[idx],
+                                 model_type = "lstm")
+    results[[length(results) + 1]] <- c(results_row("LSTM_2h", site, m), list(location = loc))
   }
+
+  # Step 8: Save this location's model so it can be applied to new data later
+  save_correction_model(rf_model, scaler = NULL, feature_cols = feature_cols,
+                         path = file.path(RESULTS_DIR, paste0("rf_", loc, "_model.rds")))
 }
 
-# =========================================================================
-# 3. Save Results and Generate Report
-# =========================================================================
-results_df <- do.call(rbind, results)
-results_df$improvement_pct <- (results_df$rmse_base - results_df$rmse_corr) / results_df$rmse_base * 100
-write.csv(results_df, file.path(OUTPUT_DIR, "beach_specialized_results.csv"), row.names = FALSE)
+results_df <- do.call(rbind, lapply(results, as.data.frame))
 
-agg <- results_df %>%
-  group_by(location, model) %>%
-  summarize(mean_base = mean(rmse_base), mean_corr = mean(rmse_corr),
-            mean_imp = mean(improvement_pct), .groups = "drop")
+# ── Save results ──────────────────────────────────────────────────────────────
+write.csv(results_df,
+          file.path(RESULTS_DIR, "beach_specialized_results.csv"),
+          row.names = FALSE)
 
-md_table <- "| Location | Model | Avg Base RMSE (°C) | Avg Corrected RMSE (°C) | Avg Improvement (%) |\n| --- | --- | --- | --- | --- |\n"
-for (i in seq_len(nrow(agg))) {
-  r <- agg[i, ]
-  md_table <- paste0(md_table, sprintf("| %s | %s | %.3f | %.3f | %.1f%% |\n",
-    r$location, r$model, r$mean_base, r$mean_corr, r$mean_imp))
-}
-
-report <- paste0(
-"# Scenario 5: Beach Habitat — Specialized (Location-Specific) Models
-
-Location-specific models are trained on each of the three coastal locations (Ashkelon, Range 24, Rosh HaNikra) and tested on local sensor sites.
-
-## 1. Per-Location Summary
-", md_table, "
-## 2. Key Takeaway
-Specialized RF models achieve comparable performance to pooled models (see Scenario 4), confirming that the Beach habitat is sufficiently homogeneous for either strategy. The marginal advantage of specialization (~0.02°C) may not justify the cost of maintaining 3 separate models.
-")
-
-writeLines(report, file.path(SCENARIO_DIR, "scenario_5_report.md"))
-cat(sprintf("\nResults saved to: %s\n", OUTPUT_DIR))
-cat("=== Scenario 5 Finished Successfully ===\n")
+cat("\nAverage performance by location:\n")
+print(aggregate(cbind(rmse_base, rmse_corr, improvement_pct) ~ location + model,
+                results_df, mean))
+cat("=== Scenario 5 complete ===\n")

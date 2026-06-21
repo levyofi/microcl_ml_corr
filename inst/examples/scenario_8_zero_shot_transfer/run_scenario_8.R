@@ -1,260 +1,161 @@
-#!/usr/bin/env Rscript
-# =========================================================================
-# Scenario 8: Zero-Shot Spatial Transfer — Training on Nearby Sites
-# Demonstrates correcting NicheMapR predictions at a NEW location using
-# a model trained ONLY on data from neighboring sites (no local data).
-# This is the practical use case of deploying a correction model to a
-# location where no temperature logger has been installed.
+# =============================================================================
+# Scenario 8: Zero-Shot Spatial Transfer
+# =============================================================================
+# Goal: Test whether a model trained on NEARBY sites can correct NicheMapR
+#       predictions at a completely new location where NO logger data exists.
 #
-# Also includes a scientific control (Size vs. Diversity downsampling)
-# to disentangle training data volume from spatial diversity effects.
-# =========================================================================
+# This is the practical deployment scenario: a researcher wants to correct
+# NicheMapR at a new field site before any sensors have been installed.
+#
+# For each beach location in turn, we pretend it is "new" (unseen) and train
+# using only the OTHER locations. We then compare four strategies:
+#
+#   A) Zero-Shot (Nearby Sites) — train on the other two locations only.
+#      This is the true zero-shot scenario: the target site was never seen.
+#
+#   B) Specialized (Local Data) — train on local data only (upper bound).
+#      This is how well we can do if we have local measurements.
+#
+#   C) Pooled (All Sites) — train on all three locations including the target.
+#      This is the best-case pooled scenario from Scenario 4.
+#
+#   D) Pooled (Downsampled to N) — train on the same NUMBER of rows as B,
+#      but drawn randomly from all three locations (not just the local one).
+#      This isolates whether the gain from pooling comes from spatial diversity
+#      or simply from having more data.
+#
+# Compare with: Scenario 2 (single logger, ~1,405 train rows)
+# Note: strategy B uses all Ashkelon loggers combined (~4,631 rows), which
+#       is already ~3× more data than the single logger in Scenario 2.
+# =============================================================================
 
-suppressPackageStartupMessages({
-  library(dplyr)
-  library(ggplot2)
-  library(ranger)
-  library(keras3)
-})
+library(microclCorr)
+library(ggplot2)
+source(system.file("examples", "utils.R", package = "microclCorr"))
 
-# Determine project root and source package functions
-pkg_examples_dir <- system.file("examples", package = "microclCorr")
-if (pkg_examples_dir != "") {
-  # Installed package
-  BEACH_PATH   <- system.file("extdata", "Beach_data_preprocessed.csv", package = "microclCorr")
-  SPLITS_PATH  <- system.file("extdata", "beach_splits.csv", package = "microclCorr")
-  SCENARIO_DIR <- system.file("examples", "scenario_8_zero_shot_transfer", package = "microclCorr")
-  OUTPUT_DIR   <- file.path(getwd(), "scenario_8_zero_shot_transfer_results")
-} else {
-  # Local development fallback
-  pkg_dir <- ""
-  for (path in c("../../../R", "../../R", "./R", "microcl_ml_corr/R")) {
-    if (dir.exists(path)) {
-      pkg_dir <- path
-      break
-    }
-  }
-  if (pkg_dir != "") {
-    for (f in list.files(pkg_dir, pattern = "\\.R$", full.names = TRUE)) {
-      source(f, local = FALSE)
-    }
-  } else {
-    library(microclCorr)
-  }
-  BEACH_PATH   <- ""
-  for (path in c("../../../inst/extdata/Beach_data_preprocessed.csv", "../../inst/extdata/Beach_data_preprocessed.csv", "./inst/extdata/Beach_data_preprocessed.csv", "microcl_ml_corr/inst/extdata/Beach_data_preprocessed.csv")) {
-    if (file.exists(path)) {
-      BEACH_PATH <- path
-      break
-    }
-  }
-  SPLITS_PATH  <- ""
-  for (path in c("../../../inst/extdata/beach_splits.csv", "../../inst/extdata/beach_splits.csv", "./inst/extdata/beach_splits.csv", "microcl_ml_corr/inst/extdata/beach_splits.csv")) {
-    if (file.exists(path)) {
-      SPLITS_PATH <- path
-      break
-    }
-  }
-  SCENARIO_DIR <- "."
-  OUTPUT_DIR   <- "./results"
-}
+# ── Settings ──────────────────────────────────────────────────────────────────
 SEED         <- 42
+SITE_COL     <- "time_series_site"
+N_DOWNSAMPLE <- 10   # number of random subsamples to average for strategy D
 
-dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
+DATA_PATH    <- system.file("extdata", "Beach_data_preprocessed.csv", package = "microclCorr")
+SPLITS_PATH  <- system.file("extdata", "beach_splits.csv",            package = "microclCorr")
+RESULTS_DIR  <- file.path("inst", "examples", "scenario_8_zero_shot_transfer", "results")
+SCENARIO_DIR <- file.path("inst", "examples", "scenario_8_zero_shot_transfer")
+dir.create(RESULTS_DIR, showWarnings = FALSE, recursive = TRUE)
 
-# Helper: load aligned splits
-load_aligned_splits <- function(data, split_csv_path, site_col, datetime_col = "time") {
-  splits_df <- read.csv(split_csv_path, stringsAsFactors = FALSE)
-  data$time_str <- format(data[[datetime_col]], "%Y-%m-%d %H:%M:%S", tz = "UTC")
-  splits_df$time_str <- format(as.POSIXct(splits_df$time, format = "%Y-%m-%d %H:%M:%S", tz = "UTC"),
-                               "%Y-%m-%d %H:%M:%S", tz = "UTC")
-  splits_df <- splits_df[, c("time_str", site_col, "split"), drop = FALSE]
-  merged <- merge(data, splits_df, by = c("time_str", site_col), all.x = TRUE)
-  merged <- merged[order(merged[[datetime_col]]), ]
-  train_df <- merged[merged$split == "train" & !is.na(merged$split), ]
-  val_df   <- merged[merged$split == "val"   & !is.na(merged$split), ]
-  test_df  <- merged[merged$split == "test"  & !is.na(merged$split), ]
-  for (df_name in c("train_df", "val_df", "test_df")) {
-    d <- get(df_name); d$time_str <- NULL; d$split <- NULL; assign(df_name, d)
-  }
-  list(train = train_df, val = val_df, test = test_df)
-}
+cat("=== Scenario 8: Zero-Shot Spatial Transfer ===\n")
 
-# =========================================================================
-# 1. Load Beach Data
-# =========================================================================
-cat("\n=== SCENARIO 8: ZERO-SHOT SPATIAL TRANSFER ===\n")
-cat("Training on nearby sites to correct predictions at an unseen location\n\n")
+# ── Step 1: Load data ─────────────────────────────────────────────────────────
+data <- load_prepared_csv_data(DATA_PATH,
+                               is_continuous_microhabitat = FALSE,
+                               datetime_format = "%Y-%m-%d %H:%M:%S",
+                               includes_index  = TRUE)
+if ("microhabitat_sun" %in% names(data)) data$microhabitat_sun <- NULL
 
-beach_data <- load_prepared_csv_data(
-  BEACH_PATH, is_continuous_microhabitat = FALSE,
-  datetime_format = "%Y-%m-%d %H:%M:%S", includes_index = TRUE
-)
-if ("microhabitat_sun" %in% names(beach_data)) beach_data$microhabitat_sun <- NULL
+# ── Step 2: Split into train / validation / test ───────────────────────────────
+splits <- load_splits_from_csv(data, SPLITS_PATH, SITE_COL)
 
-splits <- load_aligned_splits(
-  beach_data,
-  SPLITS_PATH,
-  "time_series_site"
-)
-features <- get_feature_columns(splits$train)
+# ── Step 3: Select predictor columns ──────────────────────────────────────────
+feature_cols <- get_feature_columns(splits$train)
 
-# =========================================================================
-# 2. Zero-Shot Transfer: For Each Location, Train on the OTHER Locations
-# =========================================================================
-beach_locations <- c("Ashkelon", "Range_24", "Rosh_HaNikra")
+# ── Steps 4–7: Loop — treat each location as the unseen target in turn ────────
 results <- list()
 
-for (target_loc in beach_locations) {
-  cat(sprintf("--- Target location (unseen): %s ---\n", target_loc))
-  cat(sprintf("    Training on: %s\n", paste(setdiff(beach_locations, target_loc), collapse = ", ")))
+for (target in c("Ashkelon", "Range_24", "Rosh_HaNikra")) {
+  cat(sprintf("\n── Target location (held out): %s ──\n", target))
 
-  # Test set = target location only
-  test_target <- splits$test[splits$test$location == target_loc, ]
-  X_test      <- test_target[, features, drop = FALSE]
-  y_test      <- test_target$residual
-  base_test   <- test_target$predicted
+  # Test rows = the target location only (these rows are NEVER used in training
+  # for strategies A and D)
+  test_loc  <- splits$test[splits$test$location == target, ]
+  y_test    <- test_loc$residual    # actual residuals (what we want to predict)
+  base_test <- test_loc$predicted   # NicheMapR raw prediction (no correction)
+  rmse_raw  <- sqrt(mean(y_test^2)) # baseline: error if we apply NO correction
 
-  # Raw NicheMapR baseline (no correction)
-  rmse_raw <- sqrt(mean(y_test^2))
+  # ── Strategy A: Zero-Shot — train on the other two locations ────────────────
+  train_other <- splits$train[splits$train$location != target, ]
+  rf_zs <- train_rf(train_other[, feature_cols], train_other$residual, seed = SEED)
+  m_zs  <- evaluate_correction(rf_zs, test_loc[, feature_cols], y_test, base_test,
+                                model_type = "rf")
+  results[[length(results) + 1]] <- data.frame(
+    target = target, strategy = "A: Zero-Shot (Nearby Sites)",
+    train_size = nrow(train_other), rmse_base = rmse_raw, rmse_corr = m_zs$rmse_corr)
 
-  # ---- (A) Site-Excluded RF: train on all locations EXCEPT target ----
-  train_excl <- splits$train[splits$train$location != target_loc, ]
-  rf_excl <- ranger::ranger(
-    x = train_excl[, features, drop = FALSE],
-    y = train_excl$residual, num.trees = 500, seed = SEED
-  )
-  m_excl <- evaluate_correction(rf_excl, X_test, y_test, base_test, model_type = "rf")
+  # ── Strategy B: Specialized — train on local data only (best case for local) ──
+  train_local <- splits$train[splits$train$location == target, ]
+  rf_loc <- train_rf(train_local[, feature_cols], train_local$residual, seed = SEED)
+  m_loc  <- evaluate_correction(rf_loc, test_loc[, feature_cols], y_test, base_test,
+                                 model_type = "rf")
+  results[[length(results) + 1]] <- data.frame(
+    target = target, strategy = "B: Specialized (Local Data)",
+    train_size = nrow(train_local), rmse_base = rmse_raw, rmse_corr = m_loc$rmse_corr)
+
+  # ── Strategy C: Pooled — train on all three locations (includes the target) ──
+  rf_all <- train_rf(splits$train[, feature_cols], splits$train$residual, seed = SEED)
+  m_all  <- evaluate_correction(rf_all, test_loc[, feature_cols], y_test, base_test,
+                                 model_type = "rf")
+  results[[length(results) + 1]] <- data.frame(
+    target = target, strategy = "C: Pooled (All Sites)",
+    train_size = nrow(splits$train), rmse_base = rmse_raw, rmse_corr = m_all$rmse_corr)
+
+  # ── Strategy D: Downsampled pooled — same N as local, but mixed from all sites ──
+  # By matching the training set size to strategy B, we can check whether the
+  # difference between B and C comes from MORE DATA or from DIVERSE LOCATIONS.
+  N_local  <- nrow(train_local)
+  ds_rmses <- vapply(seq_len(N_DOWNSAMPLE), function(s) {
+    set.seed(s)
+    idx   <- sample(nrow(splits$train), N_local)   # random subset of size N_local
+    rf_ds <- train_rf(splits$train[idx, feature_cols],
+                       splits$train$residual[idx], seed = s)
+    evaluate_correction(rf_ds, test_loc[, feature_cols], y_test, base_test,
+                         model_type = "rf")$rmse_corr
+  }, numeric(1))
 
   results[[length(results) + 1]] <- data.frame(
-    target = target_loc, strategy = "Zero-Shot (Nearby Sites)",
-    train_size = nrow(train_excl), n_source_locations = 2,
-    rmse_corr = m_excl$rmse_corr, rmse_base = rmse_raw, stringsAsFactors = FALSE)
-
-  # ---- (B) Specialized RF: train on local data (upper bound) ----
-  train_local <- splits$train[splits$train$location == target_loc, ]
-  rf_local <- ranger::ranger(
-    x = train_local[, features, drop = FALSE],
-    y = train_local$residual, num.trees = 500, seed = SEED
-  )
-  m_local <- evaluate_correction(rf_local, X_test, y_test, base_test, model_type = "rf")
-
-  results[[length(results) + 1]] <- data.frame(
-    target = target_loc, strategy = "Specialized (Local Data)",
-    train_size = nrow(train_local), n_source_locations = 1,
-    rmse_corr = m_local$rmse_corr, rmse_base = rmse_raw, stringsAsFactors = FALSE)
-
-  # ---- (C) Pooled RF: train on ALL locations including target ----
-  rf_pooled <- ranger::ranger(
-    x = splits$train[, features, drop = FALSE],
-    y = splits$train$residual, num.trees = 500, seed = SEED
-  )
-  m_pooled <- evaluate_correction(rf_pooled, X_test, y_test, base_test, model_type = "rf")
-
-  results[[length(results) + 1]] <- data.frame(
-    target = target_loc, strategy = "Pooled (All Sites)",
-    train_size = nrow(splits$train), n_source_locations = 3,
-    rmse_corr = m_pooled$rmse_corr, rmse_base = rmse_raw, stringsAsFactors = FALSE)
-
-  # ---- (D) Downsampled Pooled: same N as local, but mixed from all sites ----
-  N_local <- nrow(train_local)
-  ds_rmses <- c()
-  for (seed_run in 0:9) {
-    set.seed(seed_run)
-    idx <- sample(seq_len(nrow(splits$train)), N_local)
-    rf_ds <- ranger::ranger(
-      x = splits$train[idx, features, drop = FALSE],
-      y = splits$train$residual[idx], num.trees = 500, seed = seed_run
-    )
-    m_ds <- evaluate_correction(rf_ds, X_test, y_test, base_test, model_type = "rf")
-    ds_rmses <- c(ds_rmses, m_ds$rmse_corr)
-  }
-
-  results[[length(results) + 1]] <- data.frame(
-    target = target_loc, strategy = "Pooled (Downsampled to N)",
-    train_size = N_local, n_source_locations = 3,
-    rmse_corr = mean(ds_rmses), rmse_base = rmse_raw, stringsAsFactors = FALSE)
+    target = target, strategy = "D: Pooled (Downsampled to N)",
+    train_size = N_local,
+    rmse_base  = rmse_raw,
+    rmse_corr  = mean(ds_rmses))   # average over N_DOWNSAMPLE random draws
 }
 
-# =========================================================================
-# 3. Save Results, Generate Plot and Report
-# =========================================================================
 results_df <- do.call(rbind, results)
-results_df$improvement_pct <- (results_df$rmse_base - results_df$rmse_corr) / results_df$rmse_base * 100
-write.csv(results_df, file.path(OUTPUT_DIR, "zero_shot_results.csv"), row.names = FALSE)
+results_df$improvement_pct <- (results_df$rmse_base - results_df$rmse_corr) /
+                               results_df$rmse_base * 100
 
-# Plot
+# ── Step 8: Save results ──────────────────────────────────────────────────────
+write.csv(results_df,
+          file.path(RESULTS_DIR, "zero_shot_results.csv"),
+          row.names = FALSE)
+
+# ── Plot: compare strategies side by side per location ────────────────────────
 results_df$strategy <- factor(results_df$strategy,
-  levels = c("Specialized (Local Data)", "Pooled (All Sites)",
-             "Pooled (Downsampled to N)", "Zero-Shot (Nearby Sites)"))
+  levels = c("B: Specialized (Local Data)", "C: Pooled (All Sites)",
+             "D: Pooled (Downsampled to N)", "A: Zero-Shot (Nearby Sites)"))
 
 p <- ggplot(results_df, aes(x = target, y = rmse_corr, fill = strategy)) +
   geom_bar(stat = "identity", position = position_dodge(0.85), width = 0.75) +
-  geom_hline(aes(yintercept = rmse_base), linetype = "dashed", color = "#ef4444", linewidth = 0.7) +
+  # Red dashed line = uncorrected NicheMapR error (our starting point)
+  geom_hline(aes(yintercept = rmse_base), linetype = "dashed",
+             color = "#ef4444", linewidth = 0.7) +
   scale_fill_manual(values = c(
-    "Specialized (Local Data)"    = "#10b981",
-    "Pooled (All Sites)"          = "#3b82f6",
-    "Pooled (Downsampled to N)"   = "#8b5cf6",
-    "Zero-Shot (Nearby Sites)"    = "#f59e0b"
-  )) +
-  labs(
-    title = "Zero-Shot Spatial Transfer: Correcting an Unseen Location",
-    subtitle = "Can a model trained on nearby sites correct a new location?",
-    x = "Target Location (unseen during training)",
-    y = "Corrected RMSE (°C)",
-    fill = "Training Strategy"
-  ) +
+    "B: Specialized (Local Data)"    = "#10b981",
+    "C: Pooled (All Sites)"          = "#3b82f6",
+    "D: Pooled (Downsampled to N)"   = "#8b5cf6",
+    "A: Zero-Shot (Nearby Sites)"    = "#f59e0b")) +
+  labs(title    = "Zero-Shot Transfer: Can we correct an unseen location?",
+       subtitle = "Red dashed line = uncorrected NicheMapR error",
+       x        = "Target Location (held out during training)",
+       y        = "Corrected RMSE (°C)",
+       fill     = "Training Strategy") +
   theme_minimal(base_size = 11) +
-  theme(
-    plot.title = element_text(face = "bold", size = 13, hjust = 0.5),
-    plot.subtitle = element_text(size = 10, hjust = 0.5, color = "#666666"),
-    legend.position = "bottom",
-    legend.title = element_text(face = "bold"),
-    panel.grid.minor = element_blank(),
-    panel.grid.major = element_line(color = "#e5e7eb", linetype = "dotted")
-  ) +
+  theme(plot.title    = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5, color = "#666666"),
+        legend.position = "bottom") +
   guides(fill = guide_legend(nrow = 2))
 
-ggsave(file.path(SCENARIO_DIR, "zero_shot_transfer.png"), p, width = 10, height = 6, dpi = 300)
+ggsave(file.path(SCENARIO_DIR, "zero_shot_transfer.png"),
+       p, width = 10, height = 6, dpi = 300)
 
-# Markdown report
-md_table <- "| Target Location | Training Strategy | Train Size | Corrected RMSE (°C) | Raw NicheMapR (°C) | Improvement (%) |\n| --- | --- | --- | --- | --- | --- |\n"
-for (i in seq_len(nrow(results_df))) {
-  r <- results_df[i, ]
-  md_table <- paste0(md_table, sprintf("| %s | %s | %d | %.3f | %.3f | %.1f%% |\n",
-    r$target, r$strategy, r$train_size, r$rmse_corr, r$rmse_base, r$improvement_pct))
-}
-
-report <- paste0(
-"# Scenario 8: Zero-Shot Spatial Transfer — Training on Nearby Sites
-
-## Motivation
-In practice, users often want to correct NicheMapR predictions at a **new location where no temperature logger has been deployed**. This scenario evaluates whether a Random Forest model trained on data from neighboring sites can provide meaningful correction at an unseen target site.
-
-## Experimental Design
-For each Beach location, we:
-1. **Zero-Shot (Nearby Sites)**: Train RF on data from the other 2 locations only, excluding all target-site data entirely. This simulates deploying a correction model to a new field site.
-2. **Specialized (Local Data)**: Train RF on local data only (upper bound for comparison).
-3. **Pooled (All Sites)**: Train on all 3 locations including the target (best case).
-4. **Pooled (Downsampled to N)**: Train on a random sample of the pooled data matching the local dataset size. This controls for the effect of training set volume.
-
-## Results
-", md_table, "
-## Visual Summary
-![Zero-Shot Transfer Comparison](zero_shot_transfer.png)
-
-## Key Findings
-
-### Zero-Shot Transfer Provides Substantial Correction
-Even without any local training data, the zero-shot model reduces NicheMapR error by **58-68%** across all Beach locations. This confirms that the physical feature representation (radiation, humidity, wind speed, temporal encoding) captures generalizable correction patterns that transfer across sites.
-
-### The Gap to Local Models
-The zero-shot corrected RMSE (~2.5-3.6°C) is notably higher than locally-trained models (~0.6-1.1°C), indicating that **site-specific physical parameters** (localized albedo, wind blocks, terrain shading) cannot be fully resolved without some local data representation.
-
-### Practical Recommendation
-For a new field site where no logger data is available, deploying a zero-shot correction model trained on nearby regional loggers provides a meaningful first-pass correction (**>58% error reduction**) over raw NicheMapR output. Once even a small amount of local logger data becomes available, retraining as a specialized or pooled model will dramatically improve accuracy.
-")
-
-writeLines(report, file.path(SCENARIO_DIR, "scenario_8_report.md"))
-cat(sprintf("\nResults saved to: %s\n", OUTPUT_DIR))
-cat("=== Scenario 8 Finished Successfully ===\n")
+cat("\nResults:\n")
+print(results_df[, c("target", "strategy", "train_size", "rmse_corr", "improvement_pct")])
+cat("=== Scenario 8 complete ===\n")

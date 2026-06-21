@@ -1,206 +1,101 @@
-#!/usr/bin/env Rscript
-# =========================================================================
-# Scenario 7: Judean Desert — Specialized (Location-Specific) Models (Phase 2)
-# Separate models are trained per desert region (Mishmar, Tzeelim) and
-# tested on local sensor sites.
-# =========================================================================
+# =============================================================================
+# Scenario 7: Judean Desert — Specialized (Location-Specific) Models
+# =============================================================================
+# Goal: Train a SEPARATE model for each desert region (Mishmar, Tzeelim)
+#       and test whether this beats the single pooled model from Scenario 6.
+#
+# Compare with: Scenario 3 (single logger), Scenario 6 (all sites pooled)
+# =============================================================================
 
-suppressPackageStartupMessages({
-  library(dplyr)
-  library(ggplot2)
-  library(ranger)
-  library(keras3)
-})
+library(microclCorr)
+source(system.file("examples", "utils.R", package = "microclCorr"))
 
-# Determine project root and source package functions
-pkg_examples_dir <- system.file("examples", package = "microclCorr")
-if (pkg_examples_dir != "") {
-  # Installed package
-  DESERT_PATH  <- system.file("extdata", "desert_data_preprocessed.csv", package = "microclCorr")
-  SPLITS_PATH  <- system.file("extdata", "desert_splits.csv", package = "microclCorr")
-  SCENARIO_DIR <- system.file("examples", "scenario_7_desert_specialized", package = "microclCorr")
-  OUTPUT_DIR   <- file.path(getwd(), "scenario_7_desert_specialized_results")
-} else {
-  # Local development fallback
-  pkg_dir <- ""
-  for (path in c("../../../R", "../../R", "./R", "microcl_ml_corr/R")) {
-    if (dir.exists(path)) {
-      pkg_dir <- path
-      break
-    }
-  }
-  if (pkg_dir != "") {
-    for (f in list.files(pkg_dir, pattern = "\\.R$", full.names = TRUE)) {
-      source(f, local = FALSE)
-    }
-  } else {
-    library(microclCorr)
-  }
-  DESERT_PATH  <- ""
-  for (path in c("../../../inst/extdata/desert_data_preprocessed.csv", "../../inst/extdata/desert_data_preprocessed.csv", "./inst/extdata/desert_data_preprocessed.csv", "microcl_ml_corr/inst/extdata/desert_data_preprocessed.csv")) {
-    if (file.exists(path)) {
-      DESERT_PATH <- path
-      break
-    }
-  }
-  SPLITS_PATH  <- ""
-  for (path in c("../../../inst/extdata/desert_splits.csv", "../../inst/extdata/desert_splits.csv", "./inst/extdata/desert_splits.csv", "microcl_ml_corr/inst/extdata/desert_splits.csv")) {
-    if (file.exists(path)) {
-      SPLITS_PATH <- path
-      break
-    }
-  }
-  SCENARIO_DIR <- "."
-  OUTPUT_DIR   <- "./results"
-}
-SEED         <- 42
+# ── Settings ──────────────────────────────────────────────────────────────────
+SEED        <- 42
+SITE_COL    <- "site_id"
 
-dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
+DATA_PATH   <- system.file("extdata", "desert_data_preprocessed.csv", package = "microclCorr")
+SPLITS_PATH <- system.file("extdata", "desert_splits.csv",            package = "microclCorr")
+RESULTS_DIR <- file.path("inst", "examples", "scenario_7_desert_specialized", "results")
+dir.create(RESULTS_DIR, showWarnings = FALSE, recursive = TRUE)
 
-# Helper: load aligned splits
-load_aligned_splits <- function(data, split_csv_path, site_col, datetime_col = "time") {
-  splits_df <- read.csv(split_csv_path, stringsAsFactors = FALSE)
-  data$time_str <- format(data[[datetime_col]], "%Y-%m-%d %H:%M:%S", tz = "UTC")
-  splits_df$time_str <- format(as.POSIXct(splits_df$time, format = "%Y-%m-%d %H:%M:%S", tz = "UTC"),
-                               "%Y-%m-%d %H:%M:%S", tz = "UTC")
-  splits_df <- splits_df[, c("time_str", site_col, "split"), drop = FALSE]
-  merged <- merge(data, splits_df, by = c("time_str", site_col), all.x = TRUE)
-  merged <- merged[order(merged[[datetime_col]]), ]
-  train_df <- merged[merged$split == "train" & !is.na(merged$split), ]
-  val_df   <- merged[merged$split == "val"   & !is.na(merged$split), ]
-  test_df  <- merged[merged$split == "test"  & !is.na(merged$split), ]
-  for (df_name in c("train_df", "val_df", "test_df")) {
-    d <- get(df_name); d$time_str <- NULL; d$split <- NULL; assign(df_name, d)
-  }
-  list(train = train_df, val = val_df, test = test_df)
-}
+cat("=== Scenario 7: Desert Specialized ===\n")
 
-# Loader & preprocessor for Judean Desert
-prepare_desert_data <- function(path) {
-  df <- read.csv(path, row.names = 1, stringsAsFactors = FALSE)
-  df$Location <- gsub("Mishamr", "Mishmar", df$Location)
-  df$Location <- gsub("Mishmar-", "Mishmar", df$Location)
-  names(df)[names(df) == "Location"] <- "location"
-  names(df)[names(df) == "Season"]   <- "season"
-  names(df)[names(df) == "Object"]   <- "object"
-  names(df)[names(df) == "Size"]     <- "size"
-  for (col in c("size", "season", "object")) {
-    if (col %in% names(df)) {
-      orig_vals <- df[[col]]; df[[col]] <- NULL
-      for (lvl in unique(orig_vals)) df[[paste0(col, "_", lvl)]] <- as.numeric(orig_vals == lvl)
-    }
-  }
-  df <- df[, !(names(df) %in% c("id", "microhabitat")), drop = FALSE]
-  time_vals <- df$time
-  no_colon  <- !grepl(":", time_vals, fixed = TRUE)
-  time_vals[no_colon] <- paste0(time_vals[no_colon], " 0:00:00")
-  df$time <- as.POSIXct(time_vals, format = "%Y-%m-%d %H:%M:%S", tz = "UTC")
-  df[complete.cases(df), , drop = FALSE]
-}
+# ── Step 1: Load data ─────────────────────────────────────────────────────────
+data <- load_prepared_csv_data(DATA_PATH,
+                               datetime_format = "%Y-%m-%d %H:%M:%S",
+                               includes_index  = TRUE)
 
-# =========================================================================
-# 1. Load and Split Desert Data
-# =========================================================================
-cat("\n=== SCENARIO 7: DESERT SPECIALIZED MODELS ===\n")
-desert_data <- prepare_desert_data(DESERT_PATH)
+# ── Step 2: Split into train / validation / test ───────────────────────────────
+# Use the SAME pre-defined blocks as Scenario 6 for a fair comparison.
+splits <- load_splits_from_csv(data, SPLITS_PATH, SITE_COL)
 
-splits <- load_aligned_splits(
-  desert_data,
-  SPLITS_PATH,
-  "site_id"
-)
-features <- get_feature_columns(splits$train)
+# ── Step 3: Select predictor columns ──────────────────────────────────────────
+feature_cols <- get_feature_columns(splits$train)
 
-# =========================================================================
-# 2. Loop Over Desert Locations
-# =========================================================================
-desert_locations <- c("Mishmar", "Tzeelim")
+# ── Steps 4–7: Run the full pipeline once per region ──────────────────────────
 results <- list()
 
-for (loc in desert_locations) {
-  cat(sprintf("\n--- Training Specialized models for: %s ---\n", loc))
+for (region in c("Mishmar", "Tzeelim")) {
+  cat(sprintf("\n── Region: %s ──\n", region))
 
-  train_sub <- splits$train[splits$train$location == loc, ]
-  val_sub   <- splits$val[splits$val$location == loc, ]
-  test_sub  <- splits$test[splits$test$location == loc, ]
-  cat(sprintf("  Train: %d | Val: %d | Test: %d rows\n", nrow(train_sub), nrow(val_sub), nrow(test_sub)))
+  # Subset to this region only
+  train_reg <- splits$train[splits$train$location == region, ]
+  val_reg   <- splits$val  [splits$val$location   == region, ]
+  test_reg  <- splits$test [splits$test$location  == region, ]
+  cat(sprintf("Train: %d | Validation: %d | Test: %d rows\n",
+              nrow(train_reg), nrow(val_reg), nrow(test_reg)))
 
-  # ----- Specialized RF -----
-  rf_spec <- ranger::ranger(
-    x = train_sub[, features, drop = FALSE],
-    y = train_sub$residual, num.trees = 500, seed = SEED
-  )
+  # Step 4: Train a Random Forest on this region's data only
+  rf_model <- train_rf(train_reg[, feature_cols], train_reg$residual, seed = SEED)
 
-  # ----- Specialized LSTM -----
-  scaled_sub <- lstm_scaling(train_sub, val_sub, test_sub)
-  lstm_sub   <- lstm_specific_preprocessing(scaled_sub$train, scaled_sub$val, scaled_sub$test,
-                                             window_size = 2, ts_names_col = "site_id")
-  rf_test_sub <- align_test_sets(test_sub, lstm_sub$test_dict, lstm_sub$index_info, "site_id")
+  # Step 5: Train an LSTM on this region's data only
+  scaled    <- lstm_scaling(train_reg, val_reg, test_reg)
+  lstm_data <- lstm_specific_preprocessing(scaled$train, scaled$val, scaled$test,
+                                            window_size  = 2,
+                                            ts_names_col = SITE_COL)
+  lstm_model <- train_lstm(lstm_data$train_dict$X, lstm_data$train_dict$y,
+                            lstm_data$val_dict$X,   lstm_data$val_dict$y,
+                            n_units = 32, n_layers = 1, dropout = 0.0, lr = 0.005,
+                            epochs = 20, batch_size = 256, patience = 5, seed = SEED)
 
-  lstm_spec <- train_lstm(
-    lstm_sub$train_dict$X, lstm_sub$train_dict$y,
-    lstm_sub$val_dict$X,   lstm_sub$val_dict$y,
-    n_units = 32, n_layers = 1, dropout = 0.0, lr = 0.005,
-    epochs = 20, batch_size = 256, patience = 5, seed = SEED
-  )
+  # Step 6: Align test sets
+  rf_test <- align_test_sets(test_reg, lstm_data$test_dict, lstm_data$index_info, SITE_COL)
 
-  # Evaluate RF on each sub-site
-  for (ts_site in unique(rf_test_sub$site_id)) {
-    mask <- rf_test_sub$site_id == ts_site
-    m <- evaluate_correction(rf_spec,
-      rf_test_sub[mask, features, drop = FALSE],
-      rf_test_sub$residual[mask],
-      rf_test_sub$predicted[mask], model_type = "rf")
-    results[[length(results) + 1]] <- data.frame(
-      location = loc, model = "RF", ts_name = ts_site,
-      rmse_corr = m$rmse_corr, rmse_base = m$rmse_base, stringsAsFactors = FALSE)
+  # Step 7: Evaluate, recording results per logger site within this region
+  for (site in unique(rf_test[[SITE_COL]])) {
+    mask <- rf_test[[SITE_COL]] == site
+    m    <- evaluate_correction(rf_model, rf_test[mask, feature_cols],
+                                 rf_test$residual[mask], rf_test$predicted[mask],
+                                 model_type = "rf")
+    results[[length(results) + 1]] <- c(results_row("RF", site, m), list(region = region))
   }
 
-  # Evaluate LSTM on each sub-site
-  for (i in seq_along(lstm_sub$index_info$datasets)) {
-    ts_site <- lstm_sub$index_info$datasets[i]
-    idx     <- lstm_sub$index_info$test_indices[[i]] + 1
-    m <- evaluate_correction(lstm_spec,
-      lstm_sub$test_dict$X[idx, , , drop = FALSE],
-      lstm_sub$test_dict$y[idx],
-      lstm_sub$test_dict$base_pred[idx], model_type = "lstm")
-    results[[length(results) + 1]] <- data.frame(
-      location = loc, model = "LSTM_2h", ts_name = ts_site,
-      rmse_corr = m$rmse_corr, rmse_base = m$rmse_base, stringsAsFactors = FALSE)
+  for (i in seq_along(lstm_data$index_info$datasets)) {
+    site <- lstm_data$index_info$datasets[i]
+    idx  <- lstm_data$index_info$test_indices[[i]] + 1
+    m    <- evaluate_correction(lstm_model,
+                                 lstm_data$test_dict$X[idx, , , drop = FALSE],
+                                 lstm_data$test_dict$y[idx],
+                                 lstm_data$test_dict$base_pred[idx],
+                                 model_type = "lstm")
+    results[[length(results) + 1]] <- c(results_row("LSTM_2h", site, m), list(region = region))
   }
+
+  # Step 8: Save this region's model
+  save_correction_model(rf_model, scaler = NULL, feature_cols = feature_cols,
+                         path = file.path(RESULTS_DIR, paste0("rf_", region, "_model.rds")))
 }
 
-# =========================================================================
-# 3. Save Results and Generate Report
-# =========================================================================
-results_df <- do.call(rbind, results)
-results_df$improvement_pct <- (results_df$rmse_base - results_df$rmse_corr) / results_df$rmse_base * 100
-write.csv(results_df, file.path(OUTPUT_DIR, "desert_specialized_results.csv"), row.names = FALSE)
+results_df <- do.call(rbind, lapply(results, as.data.frame))
+results_df$microhabitat <- ifelse(grepl("Bush", results_df$site), "Bush", "Rock")
 
-agg <- results_df %>%
-  mutate(microhabitat = ifelse(grepl("Bush", ts_name), "Bush", "Rock")) %>%
-  group_by(location, microhabitat, model) %>%
-  summarize(mean_base = mean(rmse_base), mean_corr = mean(rmse_corr),
-            mean_imp = mean(improvement_pct), .groups = "drop")
+# ── Save results ──────────────────────────────────────────────────────────────
+write.csv(results_df,
+          file.path(RESULTS_DIR, "desert_specialized_results.csv"),
+          row.names = FALSE)
 
-md_table <- "| Location | Microhabitat | Model | Avg Base RMSE (°C) | Avg Corrected RMSE (°C) | Avg Improvement (%) |\n| --- | --- | --- | --- | --- | --- |\n"
-for (i in seq_len(nrow(agg))) {
-  r <- agg[i, ]
-  md_table <- paste0(md_table, sprintf("| %s | %s | %s | %.3f | %.3f | %.1f%% |\n",
-    r$location, r$microhabitat, r$model, r$mean_base, r$mean_corr, r$mean_imp))
-}
-
-report <- paste0(
-"# Scenario 7: Judean Desert — Specialized (Location-Specific) Models
-
-Location-specific models are trained on each of the two desert regions (Mishmar, Tzeelim) and tested on local sensor sites, aggregated by microhabitat type.
-
-## 1. Per-Location & Microhabitat Summary
-", md_table, "
-## 2. Key Takeaway
-Specialized desert models perform comparably to the pooled model (Scenario 6), with the pooling penalty being effectively zero for RF. This confirms that RF correction is robust to both training strategies in the Judean Desert.
-")
-
-writeLines(report, file.path(SCENARIO_DIR, "scenario_7_report.md"))
-cat(sprintf("\nResults saved to: %s\n", OUTPUT_DIR))
-cat("=== Scenario 7 Finished Successfully ===\n")
+cat("\nAverage performance by region and microhabitat:\n")
+print(aggregate(cbind(rmse_base, rmse_corr, improvement_pct) ~ model + region + microhabitat,
+                results_df, mean))
+cat("=== Scenario 7 complete ===\n")

@@ -1,188 +1,176 @@
-#!/usr/bin/env Rscript
-# =========================================================================
-# Scenario 4: Beach Habitat — Pooled Spatial Generalization (Phase 2)
-# A single unified model is trained on ALL beach locations and tested
-# on each individual sensor site.
-# =========================================================================
+# =============================================================================
+# Scenario 4: Beach Habitat — Pooled Spatial Generalization
+# =============================================================================
+# Goal: Train ONE shared model on data from ALL 7 beach loggers combined,
+#       then test how well it corrects predictions at each individual site.
+#
+# Background — what this pipeline does:
+#   NicheMapR is a physical model that predicts local microclimate temperatures.
+#   It is not perfect: there is always a gap between its prediction and what a
+#   temperature logger actually measures. This gap is called the "residual":
+#
+#       residual = measured temperature − NicheMapR prediction
+#
+#   The microclCorr package trains a machine learning model to predict that
+#   residual. At any new time point, the corrected temperature is then:
+#
+#       corrected temperature = NicheMapR prediction + predicted residual
+#
+#   Two model types are compared:
+#     • Random Forest (RF) — an ensemble of decision trees, fast and robust.
+#     • LSTM — a neural network designed for time-series data.
+#
+#   Accuracy is measured by RMSE (Root Mean Squared Error, in °C).
+#   Lower RMSE = smaller average error. Improvement % = reduction relative
+#   to the uncorrected NicheMapR baseline.
+#
+# Compare with: Scenario 2 (single logger), Scenario 5 (per-location models)
+# Note: the pooled model uses ~10× more training data than Scenario 2, so
+#       the performance difference is not purely due to spatial diversity.
+# =============================================================================
 
-suppressPackageStartupMessages({
-  library(dplyr)
-  library(ggplot2)
-  library(ranger)
-  library(keras3)
-})
+library(microclCorr)
+source(system.file("examples", "utils.R", package = "microclCorr"))
 
-# Determine project root and source package functions
-pkg_examples_dir <- system.file("examples", package = "microclCorr")
-if (pkg_examples_dir != "") {
-  # Installed package
-  BEACH_PATH   <- system.file("extdata", "Beach_data_preprocessed.csv", package = "microclCorr")
-  SPLITS_PATH  <- system.file("extdata", "beach_splits.csv", package = "microclCorr")
-  SCENARIO_DIR <- system.file("examples", "scenario_4_beach_pooled", package = "microclCorr")
-  OUTPUT_DIR   <- file.path(getwd(), "scenario_4_beach_pooled_results")
-} else {
-  # Local development fallback
-  pkg_dir <- ""
-  for (path in c("../../../R", "../../R", "./R", "microcl_ml_corr/R")) {
-    if (dir.exists(path)) {
-      pkg_dir <- path
-      break
-    }
-  }
-  if (pkg_dir != "") {
-    for (f in list.files(pkg_dir, pattern = "\\.R$", full.names = TRUE)) {
-      source(f, local = FALSE)
-    }
-  } else {
-    library(microclCorr)
-  }
-  BEACH_PATH   <- ""
-  for (path in c("../../../inst/extdata/Beach_data_preprocessed.csv", "../../inst/extdata/Beach_data_preprocessed.csv", "./inst/extdata/Beach_data_preprocessed.csv", "microcl_ml_corr/inst/extdata/Beach_data_preprocessed.csv")) {
-    if (file.exists(path)) {
-      BEACH_PATH <- path
-      break
-    }
-  }
-  SPLITS_PATH  <- ""
-  for (path in c("../../../inst/extdata/beach_splits.csv", "../../inst/extdata/beach_splits.csv", "./inst/extdata/beach_splits.csv", "microcl_ml_corr/inst/extdata/beach_splits.csv")) {
-    if (file.exists(path)) {
-      SPLITS_PATH <- path
-      break
-    }
-  }
-  SCENARIO_DIR <- "."
-  OUTPUT_DIR   <- "./results"
-}
-SEED          <- 42
+# ── Settings ──────────────────────────────────────────────────────────────────
+SEED        <- 42    # fixing the random seed makes results reproducible
+SITE_COL    <- "time_series_site"   # column that identifies each logger
 
-dir.create(OUTPUT_DIR, recursive = TRUE, showWarnings = FALSE)
+# Input data (installed with the package)
+DATA_PATH   <- system.file("extdata", "Beach_data_preprocessed.csv", package = "microclCorr")
+SPLITS_PATH <- system.file("extdata", "beach_splits.csv",            package = "microclCorr")
 
-# Helper: load aligned splits from Python-exported split file
-load_aligned_splits <- function(data, split_csv_path, site_col, datetime_col = "time") {
-  splits_df <- read.csv(split_csv_path, stringsAsFactors = FALSE)
-  data$time_str <- format(data[[datetime_col]], "%Y-%m-%d %H:%M:%S", tz = "UTC")
-  splits_df$time_str <- format(as.POSIXct(splits_df$time, format = "%Y-%m-%d %H:%M:%S", tz = "UTC"),
-                               "%Y-%m-%d %H:%M:%S", tz = "UTC")
-  splits_df <- splits_df[, c("time_str", site_col, "split"), drop = FALSE]
-  merged <- merge(data, splits_df, by = c("time_str", site_col), all.x = TRUE)
-  merged <- merged[order(merged[[datetime_col]]), ]
-  train_df <- merged[merged$split == "train" & !is.na(merged$split), ]
-  val_df   <- merged[merged$split == "val"   & !is.na(merged$split), ]
-  test_df  <- merged[merged$split == "test"  & !is.na(merged$split), ]
-  for (df_name in c("train_df", "val_df", "test_df")) {
-    d <- get(df_name); d$time_str <- NULL; d$split <- NULL; assign(df_name, d)
-  }
-  list(train = train_df, val = val_df, test = test_df)
-}
+# Where to write results
+RESULTS_DIR <- file.path("inst", "examples", "scenario_4_beach_pooled", "results")
+dir.create(RESULTS_DIR, showWarnings = FALSE, recursive = TRUE)
 
-# =========================================================================
-# 1. Load and Split Beach Data
-# =========================================================================
-cat("\n=== SCENARIO 4: BEACH POOLED MODEL ===\n")
-beach_data <- load_prepared_csv_data(
-  BEACH_PATH, is_continuous_microhabitat = FALSE,
-  datetime_format = "%Y-%m-%d %H:%M:%S", includes_index = TRUE
-)
-if ("microhabitat_sun" %in% names(beach_data)) beach_data$microhabitat_sun <- NULL
+cat("=== Scenario 4: Beach Pooled ===\n")
 
-splits <- load_aligned_splits(
-  beach_data,
-  SPLITS_PATH,
-  "time_series_site"
-)
-cat(sprintf("  Train: %d | Val: %d | Test: %d rows\n", nrow(splits$train), nrow(splits$val), nrow(splits$test)))
+# ── Step 1: Load data ─────────────────────────────────────────────────────────
+# Read the pre-aligned CSV. The function parses the datetime column and
+# creates one binary (0/1) column per habitat category (e.g. shade, rock).
+data <- load_prepared_csv_data(DATA_PATH,
+                               is_continuous_microhabitat = FALSE,
+                               datetime_format = "%Y-%m-%d %H:%M:%S",
+                               includes_index  = TRUE)
+# The beach data has no "sun" microhabitat — remove that column if present
+if ("microhabitat_sun" %in% names(data)) data$microhabitat_sun <- NULL
 
-scaled   <- lstm_scaling(splits$train, splits$val, splits$test)
-features <- get_feature_columns(splits$train)
+# ── Step 2: Split into train / validation / test ───────────────────────────────
+# We use pre-defined time blocks shared with Scenario 5 so that results are
+# directly comparable. Each row is labelled "train", "val", or "test".
+#   • train  — rows the model learns from
+#   • val    — rows used to tune the model during training (not seen at test time)
+#   • test   — rows held out to measure final accuracy
+splits <- load_splits_from_csv(data, SPLITS_PATH, SITE_COL)
+cat(sprintf("Train: %d | Validation: %d | Test: %d rows\n",
+            nrow(splits$train), nrow(splits$val), nrow(splits$test)))
 
-lstm_2h <- lstm_specific_preprocessing(scaled$train, scaled$val, scaled$test,
-                                        window_size = 2, ts_names_col = "time_series_site")
-rf_test_aligned <- align_test_sets(splits$test, lstm_2h$test_dict,
-                                    lstm_2h$index_info, "time_series_site")
+# ── Step 3: Select predictor columns ──────────────────────────────────────────
+# Identify which columns to use as model inputs (environmental variables,
+# cyclical time features, habitat indicators). The function automatically
+# excludes target columns (residual), identifiers (site ID), and timestamps.
+feature_cols <- get_feature_columns(splits$train)
 
-# =========================================================================
-# 2. Train Pooled Random Forest
-# =========================================================================
-cat("Training Pooled Random Forest...\n")
-rf_pooled <- ranger::ranger(
-  x = splits$train[, features, drop = FALSE],
-  y = splits$train$residual,
-  num.trees = 500, seed = SEED
+# ── Step 4: Train a Random Forest ─────────────────────────────────────────────
+# A Random Forest builds many decision trees on random subsets of the data
+# and averages their predictions. It is fast and handles non-linear patterns
+# without requiring data normalisation.
+rf_model <- train_rf(
+  splits$train[, feature_cols],  # predictor columns for training rows
+  splits$train$residual,         # target: the gap between measured and NicheMapR
+  seed = SEED
 )
 
+# ── Step 5: Train an LSTM neural network ──────────────────────────────────────
+# An LSTM (Long Short-Term Memory) network is designed for sequential data.
+# It looks at a short window of consecutive hours and learns temporal patterns
+# (e.g. how temperature from the previous 2 hours affects the current error).
+
+# 5a. Normalise all values to the 0–1 range.
+#     Neural networks train more stably when inputs are on a common scale.
+#     Crucially, the scaling parameters are computed on TRAINING data only
+#     so that the test set remains unseen.
+scaled <- lstm_scaling(splits$train, splits$val, splits$test)
+
+# 5b. Reshape the time series into overlapping windows of fixed length.
+#     Each window contains 2 consecutive hours; the model predicts the residual
+#     at the final hour of the window.
+lstm_data <- lstm_specific_preprocessing(
+  scaled$train, scaled$val, scaled$test,
+  window_size  = 2,         # look back 2 hours
+  ts_names_col = SITE_COL   # column identifying each logger (prevents bridging gaps between sites)
+)
+
+# 5c. Fit the LSTM.
+lstm_model <- train_lstm(
+  lstm_data$train_dict$X, lstm_data$train_dict$y,   # training windows
+  lstm_data$val_dict$X,   lstm_data$val_dict$y,     # validation windows (for early stopping)
+  n_units    = 32,    # number of memory cells in the LSTM layer
+  n_layers   = 1,     # a single LSTM layer is sufficient for hourly microclimate data
+  dropout    = 0.0,   # no dropout — the dataset is large enough without regularisation
+  lr         = 0.005, # learning rate: how quickly the network adjusts its weights
+  epochs     = 40,    # maximum number of passes over the training data
+  batch_size = 128,   # number of windows processed per weight update
+  patience   = 5,     # stop early if validation error has not improved for 5 epochs
+  seed       = SEED
+)
+
+# ── Step 6: Align the test sets ───────────────────────────────────────────────
+# The LSTM predicts only at the END of each time window (not for every row).
+# This step filters the RF test set to those same time points so that both
+# models are evaluated on an identical set of rows — a fair comparison.
+rf_test <- align_test_sets(
+  splits$test,
+  lstm_data$test_dict,
+  lstm_data$index_info,
+  SITE_COL
+)
+
+# ── Step 7: Evaluate both models, site by site ────────────────────────────────
+# evaluate_correction() computes RMSE before correction (NicheMapR baseline)
+# and after correction (model output), for the held-out test rows.
 results <- list()
-for (ts_site in unique(rf_test_aligned$time_series_site)) {
-  mask <- rf_test_aligned$time_series_site == ts_site
-  m <- evaluate_correction(rf_pooled,
-    rf_test_aligned[mask, features, drop = FALSE],
-    rf_test_aligned$residual[mask],
-    rf_test_aligned$predicted[mask], model_type = "rf")
-  results[[length(results) + 1]] <- data.frame(
-    model = "RF", scenario = "Pooled", ts_name = ts_site,
-    rmse_corr = m$rmse_corr, rmse_base = m$rmse_base, stringsAsFactors = FALSE)
+
+# RF evaluation — one row per site
+for (site in unique(rf_test[[SITE_COL]])) {
+  mask <- rf_test[[SITE_COL]] == site
+  m    <- evaluate_correction(
+            rf_model,
+            rf_test[mask, feature_cols],
+            rf_test$residual[mask],
+            rf_test$predicted[mask],
+            model_type = "rf")
+  results[[length(results) + 1]] <- results_row("RF", site, m)
 }
 
-# =========================================================================
-# 3. Train Pooled LSTM (2h window)
-# =========================================================================
-cat("Training Pooled LSTM (2h)...\n")
-lstm_pooled <- train_lstm(
-  lstm_2h$train_dict$X, lstm_2h$train_dict$y,
-  lstm_2h$val_dict$X,   lstm_2h$val_dict$y,
-  n_units = 32, n_layers = 1, dropout = 0.0, lr = 0.005,
-  epochs = 40, batch_size = 128, patience = 5, seed = SEED
-)
-
-for (i in seq_along(lstm_2h$index_info$datasets)) {
-  ts_site <- lstm_2h$index_info$datasets[i]
-  idx     <- lstm_2h$index_info$test_indices[[i]] + 1
-  m <- evaluate_correction(lstm_pooled,
-    lstm_2h$test_dict$X[idx, , , drop = FALSE],
-    lstm_2h$test_dict$y[idx],
-    lstm_2h$test_dict$base_pred[idx], model_type = "lstm")
-  results[[length(results) + 1]] <- data.frame(
-    model = "LSTM_2h", scenario = "Pooled", ts_name = ts_site,
-    rmse_corr = m$rmse_corr, rmse_base = m$rmse_base, stringsAsFactors = FALSE)
+# LSTM evaluation — one row per site (index_info maps windows back to sites)
+for (i in seq_along(lstm_data$index_info$datasets)) {
+  site <- lstm_data$index_info$datasets[i]
+  idx  <- lstm_data$index_info$test_indices[[i]] + 1   # convert 0-based to 1-based index
+  m    <- evaluate_correction(
+            lstm_model,
+            lstm_data$test_dict$X[idx, , , drop = FALSE],
+            lstm_data$test_dict$y[idx],
+            lstm_data$test_dict$base_pred[idx],
+            model_type = "lstm")
+  results[[length(results) + 1]] <- results_row("LSTM_2h", site, m)
 }
 
-# =========================================================================
-# 4. Save Results and Generate Report
-# =========================================================================
 results_df <- do.call(rbind, results)
-results_df$improvement_pct <- (results_df$rmse_base - results_df$rmse_corr) / results_df$rmse_base * 100
-write.csv(results_df, file.path(OUTPUT_DIR, "beach_pooled_results.csv"), row.names = FALSE)
 
-# Summary table
-agg <- results_df %>%
-  group_by(model) %>%
-  summarize(mean_base = mean(rmse_base), mean_corr = mean(rmse_corr),
-            mean_imp = mean(improvement_pct), .groups = "drop")
+# ── Step 8: Save results and model ────────────────────────────────────────────
+write.csv(results_df,
+          file.path(RESULTS_DIR, "beach_pooled_results.csv"),
+          row.names = FALSE)
 
-md_table <- "| Model | Avg Base RMSE (°C) | Avg Corrected RMSE (°C) | Avg Improvement (%) |\n| --- | --- | --- | --- |\n"
-for (i in seq_len(nrow(agg))) {
-  r <- agg[i, ]
-  md_table <- paste0(md_table, sprintf("| %s | %.3f | %.3f | %.1f%% |\n", r$model, r$mean_base, r$mean_corr, r$mean_imp))
-}
+# Save the RF model so it can be loaded and applied to new data later
+save_correction_model(rf_model,
+                       scaler       = NULL,         # RF does not need a scaler
+                       feature_cols = feature_cols,
+                       path         = file.path(RESULTS_DIR, "rf_pooled_model.rds"))
 
-md_sites <- "| Site | Model | Base RMSE (°C) | Corrected RMSE (°C) | Improvement (%) |\n| --- | --- | --- | --- | --- |\n"
-for (i in seq_len(nrow(results_df))) {
-  r <- results_df[i, ]
-  md_sites <- paste0(md_sites, sprintf("| %s | %s | %.3f | %.3f | %.1f%% |\n", r$ts_name, r$model, r$rmse_base, r$rmse_corr, r$improvement_pct))
-}
-
-report <- paste0(
-"# Scenario 4: Beach Habitat — Pooled Spatial Generalization
-
-A single unified model trained on all 7 Beach logger locations is evaluated on each individual site to measure spatial transferability.
-
-## 1. Aggregated Summary
-", md_table, "
-## 2. Per-Site Results
-", md_sites, "
-## 3. Key Takeaway
-The pooled RF model achieves >88% error reduction on every beach site, confirming that a single unified model generalizes well across homogeneous coastal microhabitats without meaningful accuracy loss compared to specialized models.
-")
-
-writeLines(report, file.path(SCENARIO_DIR, "scenario_4_report.md"))
-cat(sprintf("\nResults saved to: %s\n", OUTPUT_DIR))
-cat("=== Scenario 4 Finished Successfully ===\n")
+# ── Summary ───────────────────────────────────────────────────────────────────
+cat("\nAverage performance across all sites:\n")
+print(aggregate(cbind(rmse_base, rmse_corr, improvement_pct) ~ model, results_df, mean))
+cat("=== Scenario 4 complete ===\n")
