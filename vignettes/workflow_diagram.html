@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>microclCorr — Workflow Diagram</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f8f9fa;
+      color: #1a1a2e;
+      padding: 32px;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: #1a1a2e;
+    }
+
+    .subtitle {
+      font-size: 0.9rem;
+      color: #6b7280;
+      margin-bottom: 24px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      padding: 32px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+
+    .legend {
+      margin-top: 28px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8rem;
+      color: #4b5563;
+    }
+
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+
+    .dot-outside { background: #f59e0b; }
+    .dot-rf      { background: #10b981; }
+    .dot-lstm    { background: #8b5cf6; }
+    .dot-infer   { background: #ef4444; }
+  </style>
+</head>
+<body>
+
+<h1>microclCorr — Package Workflow</h1>
+<p class="subtitle">From raw CSV files to corrected microclimate predictions. Differences for the multiple-logger case are marked with ⚠️.</p>
+
+<div class="card">
+  <div class="mermaid">
+flowchart TD
+    subgraph OUTSIDE_S ["⚙️  Single Logger — Outside Package"]
+      direction TB
+      A1[("📄 Logger Data CSV\nmeasured temperatures, timestamps, site info")]
+      B1[("📄 NicheMapR Predictions CSV\npredicted temperatures, environmental features")]
+      PRE1["Join both tables on timestamp\nadd residual = measured − predicted"]
+      CSV1[("📄 Aligned CSV")]
+      A1 & B1 --> PRE1 --> CSV1
+    end
+
+    subgraph OUTSIDE_P ["⚙️  Multiple Loggers — Outside Package"]
+      direction TB
+      L1["📄 Logger 1 CSV"] & L2["📄 Logger 2 CSV"] & LN["📄 Logger N CSV"] & NM["📄 NicheMapR Predictions"]
+      PRE2["1. Align each logger to its NicheMapR predictions\n2. Add residual = measured − predicted\n3. Add a microhabitat column if not already present (e.g. 'sun', 'shade')\n4. Add a site ID column (e.g. column 'Site_ID' with values 'Mishmar River', 'Zeelim River')\n5. Stack all tables into one file"]
+      CSV2[("📄 Pooled Aligned CSV")]
+      L1 & L2 & LN & NM --> PRE2 --> CSV2
+    end
+
+    CSV1 & CSV2 --> LOAD["load_prepared_csv_data()\nadds: parsed datetime column, one binary column per habitat category (e.g. sun / shade / rock)"]
+
+    LOAD --> FE["add_cyclical_time()\nadds: hour-of-day and month encoded as smooth cycles\nso Dec and Jan are treated as close in time, not far apart"]
+    FE --> GFC["get_feature_columns()\nreturns: list of input variable names to use for training"]
+
+    GFC --> SPLIT["split_train_val_test()\n⚠️ Multiple loggers: use stratified_split_train_val_test() to ensure every logger appears in each subset\nreturns: 3 non-overlapping subsets — train, validation, test"]
+
+    SPLIT --> RFA & LSTMA
+
+    subgraph RFA ["🌲  Random Forest — Training"]
+      direction TB
+      RF1["train_rf()\nreturns: trained Random Forest model"]
+    end
+
+    subgraph LSTMA ["🧠  LSTM — Training"]
+      direction TB
+      SC1["lstm_scaling()\nscales all values to 0–1 range (using training data only)"]
+      WN1["lstm_specific_preprocessing()\nslices the time series into overlapping windows of fixed length\n⚠️ Multiple loggers: set ts_names_col = 'Site_ID' so gaps between loggers are never bridged"]
+      LT1["train_lstm()\nreturns: trained LSTM model"]
+      SC1 --> WN1 --> LT1
+    end
+
+    RF1 & LT1 --> AL1["align_test_sets()\nLSTM produces one prediction per time window, not per row\nThis step trims the RF test set to those same time points\nso both models are evaluated on identical rows"]
+
+    AL1 --> EVAL1["evaluate_correction()\nrun once per model — returns prediction error\nbefore and after correction (RMSE and R²)"]
+
+    EVAL1 --> CMP1["Compare models — pick best correction accuracy"]
+
+    CMP1 --> SAV1["save_correction_model()\nsaves: trained model, scaling parameters, input variable list → .rds"]
+
+    SAV1 --> INF1
+
+    subgraph INF1 ["🚀  Apply to New Data"]
+      direction LR
+      LOD1["load_correction_model()"] --> PRD1["correct_predictions()\nreturns: original prediction, correction amount, final corrected value"]
+    end
+
+    style OUTSIDE_S fill:#fef3c7,stroke:#f59e0b,color:#92400e
+    style OUTSIDE_P fill:#fef3c7,stroke:#f59e0b,color:#92400e
+    style RFA       fill:#ecfdf5,stroke:#10b981
+    style LSTMA     fill:#f5f3ff,stroke:#8b5cf6
+    style INF1      fill:#fef2f2,stroke:#ef4444
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot dot-outside"></div> Outside package (user code)</div>
+    <div class="legend-item"><div class="legend-dot dot-rf"></div> Random Forest path</div>
+    <div class="legend-item"><div class="legend-dot dot-lstm"></div> LSTM path</div>
+    <div class="legend-item"><div class="legend-dot dot-infer"></div> Apply to new data</div>
+    <div class="legend-item">⚠️ Step differs for multiple loggers</div>
+  </div>
+</div>
+
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: 'default', flowchart: { curve: 'basis' } });
+</script>
+</body>
+</html>

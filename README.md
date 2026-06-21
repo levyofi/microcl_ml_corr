@@ -20,6 +20,24 @@ By combining physical microclimatic baseline simulations with Random Forests (`r
 
 ---
 
+## Workflow
+
+The diagram below shows the full pipeline from raw input files to corrected predictions. The two pre-processing paths (single logger vs. multiple loggers) merge into a shared ML workflow. Steps that differ for the multiple-logger case are marked with ⚠️.
+
+![microclCorr workflow](vignettes/workflow_combined.png)
+
+The interactive version with both tabs is available at [`vignettes/workflow_diagram.html`](vignettes/workflow_diagram.html).
+
+**Input files required:**
+- **Logger data CSV** — measured temperatures, timestamps, microhabitat label, and any environmental covariates
+- **NicheMapR predictions CSV** — model-predicted temperatures and environmental features at the same location and times
+
+**Key steps outside the package (user responsibility):**
+1. Align both files by timestamp and compute `residual = measured − predicted`
+2. *(Multiple loggers only)* Add a microhabitat column if not present, a site ID column (e.g. `Site_ID` with values like `"Mishmar River"`), then stack all logger tables into one file
+
+---
+
 ## Installation Instructions
 
 You can install `microclCorr` directly from GitHub.

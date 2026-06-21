@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: white; padding: 40px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    h2 { font-size: 1.2rem; margin-bottom: 4px; color: #1a1a2e; }
+    p  { font-size: 0.85rem; color: #6b7280; margin-bottom: 24px; }
+    .mermaid { display: flex; justify-content: center; }
+    .legend { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 16px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #4b5563; }
+    .legend-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+    .dot-outside { background: #f59e0b; }
+    .dot-rf      { background: #10b981; }
+    .dot-lstm    { background: #8b5cf6; }
+    .dot-infer   { background: #ef4444; }
+  </style>
+</head>
+<body>
+  <h2>microclCorr — Single Logger Workflow</h2>
+  <p>Starting from one logger CSV and one NicheMapR predictions CSV.</p>
+
+  <div class="mermaid">
+flowchart TD
+    subgraph OUTSIDE1 ["⚙️  Outside Package — User Pre-processing"]
+      direction TB
+      A1[("📄 Logger Data CSV\nmeasured temperatures, timestamps, site info")]
+      B1[("📄 NicheMapR Predictions CSV\npredicted temperatures, environmental features")]
+      PRE1["Join both tables on timestamp\nadd residual = measured − predicted"]
+      CSV1[("📄 Aligned CSV\ntime, predicted, residual, microhabitat, temp_air, solar, …")]
+      A1 & B1 --> PRE1 --> CSV1
+    end
+
+    CSV1 --> LOAD1["load_prepared_csv_data()\nadds: parsed datetime column, one binary column per habitat category (e.g. sun / shade / rock)"]
+
+    LOAD1 --> FE1["add_cyclical_time()\nadds: hour-of-day and month encoded as smooth cycles\nso Dec and Jan are treated as close in time, not far apart"]
+    FE1    --> GFC1["get_feature_columns()\nreturns: list of input variable names to use for training"]
+
+    GFC1 --> SPLIT1["split_train_val_test()\nreturns: 3 non-overlapping subsets — train, validation, test"]
+
+    SPLIT1 --> RFA & LSTMA
+
+    subgraph RFA ["🌲  Random Forest — Training"]
+      direction TB
+      RF1["train_rf()\nreturns: trained Random Forest model"]
+    end
+
+    subgraph LSTMA ["🧠  LSTM — Training"]
+      direction TB
+      SC1["lstm_scaling()\nscales all values to 0–1 range (using training data only)"]
+      WN1["lstm_specific_preprocessing()\nslices the time series into overlapping windows of fixed length"]
+      LT1["train_lstm()\nreturns: trained LSTM model"]
+      SC1 --> WN1 --> LT1
+    end
+
+    RF1 & LT1 --> AL1["align_test_sets()\nLSTM produces one prediction per time window, not per row\nThis step trims the RF test set to those same time points\nso both models are evaluated on identical rows"]
+
+    AL1 --> EVAL1["evaluate_correction()\nrun once per model — returns prediction error\nbefore and after correction (RMSE and R²)"]
+
+    EVAL1 --> CMP1["Compare models — pick best correction accuracy"]
+
+    CMP1 --> SAV1["save_correction_model()\nsaves: trained model, scaling parameters, input variable list → .rds"]
+
+    SAV1 --> INF1
+
+    subgraph INF1 ["🚀  Apply to New Data"]
+      direction LR
+      LOD1["load_correction_model()"] --> PRD1["correct_predictions()\nreturns: original prediction, correction amount, final corrected value"]
+    end
+
+    style OUTSIDE1 fill:#fef3c7,stroke:#f59e0b,color:#92400e
+    style RFA      fill:#ecfdf5,stroke:#10b981
+    style LSTMA    fill:#f5f3ff,stroke:#8b5cf6
+    style INF1     fill:#fef2f2,stroke:#ef4444
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot dot-outside"></div> Outside package (user code)</div>
+    <div class="legend-item"><div class="legend-dot dot-rf"></div> Random Forest path</div>
+    <div class="legend-item"><div class="legend-dot dot-lstm"></div> LSTM path</div>
+    <div class="legend-item"><div class="legend-dot dot-infer"></div> Apply to new data</div>
+  </div>
+
+  <script>
+    mermaid.initialize({ startOnLoad: true, theme: 'default', flowchart: { curve: 'basis' } });
+  </script>
+</body>
+</html>

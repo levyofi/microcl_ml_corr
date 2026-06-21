@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: white; padding: 40px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    h2 { font-size: 1.2rem; margin-bottom: 4px; color: #1a1a2e; }
+    p  { font-size: 0.85rem; color: #6b7280; margin-bottom: 24px; }
+    .mermaid { display: flex; justify-content: center; }
+    .legend { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 16px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; color: #4b5563; }
+    .legend-dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+    .dot-outside { background: #f59e0b; }
+    .dot-rf      { background: #10b981; }
+    .dot-lstm    { background: #8b5cf6; }
+    .dot-infer   { background: #ef4444; }
+  </style>
+</head>
+<body>
+  <h2>microclCorr — Pooled Workflow (Multiple Loggers)</h2>
+  <p>Align each logger separately, add a site ID column, then stack — the rest is nearly identical to the single-logger workflow.</p>
+
+  <div class="mermaid">
+flowchart TD
+    subgraph OUTSIDE2 ["⚙️  Outside Package — User Pre-processing"]
+      direction TB
+      A2["📄 Logger 1 CSV"]
+      B2["📄 Logger 2 CSV"]
+      C2["📄 Logger N CSV"]
+      NM["📄 NicheMapR Predictions\n(one file or per-logger)"]
+      PRE2["1. Align each logger to its NicheMapR predictions\n2. Add residual = measured − predicted\n3. Add a microhabitat column if not already present (e.g. 'sun', 'shade')\n4. Add a site ID column (e.g. column 'Site_ID' with values 'Mishmar River', 'Zeelim River')\n5. Stack all tables into one file"]
+      CSV2[("📄 Pooled Aligned CSV\ntime, predicted, residual, microhabitat, site_id, temp_air, …")]
+      A2 & B2 & C2 & NM --> PRE2 --> CSV2
+    end
+
+    CSV2 --> LOAD2["load_prepared_csv_data()\nadds: parsed datetime column, one binary column per habitat category (e.g. sun / shade / rock)"]
+
+    LOAD2 --> FE2["add_cyclical_time()  +  get_feature_columns()\nadds: hour-of-day and month as smooth cycles — returns list of input variable names"]
+
+    FE2 --> SPLIT2["stratified_split_train_val_test()\nreturns: 3 non-overlapping subsets — every logger represented in each"]
+
+    SPLIT2 --> RFB & LSTMB
+
+    subgraph RFB ["🌲  Random Forest — Training"]
+      direction TB
+      RF3["train_rf()\nreturns: trained Random Forest model (all loggers pooled)"]
+    end
+
+    subgraph LSTMB ["🧠  LSTM — Training  (one change from single-logger)"]
+      direction TB
+      SC2["lstm_scaling()\nscales all values to 0–1 range (using training data only)"]
+      WN2["lstm_specific_preprocessing()  ts_names_col = 'time_series_doc'\nslices each logger's time series into windows separately\nso gaps between loggers are never bridged"]
+      LT2["train_lstm()\nreturns: trained LSTM model"]
+      SC2 --> WN2 --> LT2
+    end
+
+    RF3 & LT2 --> AL2["align_test_sets()\nLSTM produces one prediction per time window, not per row\nThis step trims the RF test set to those same time points\nso both models are evaluated on identical rows"]
+
+    AL2 --> EVAL2["evaluate_correction()\nrun once per model — returns prediction error\nbefore and after correction (RMSE and R²)"]
+
+    EVAL2 --> CMP2["Compare models — pick best correction accuracy"]
+
+    CMP2 --> SAV2["save_correction_model()\nsaves: trained model, scaling parameters, input variable list → .rds"]
+
+    SAV2 --> INF2
+
+    subgraph INF2 ["🚀  Apply to New Data"]
+      direction LR
+      LOD2["load_correction_model()"] --> PRD2["correct_predictions()\nreturns: original prediction, correction amount, final corrected value"]
+    end
+
+    style OUTSIDE2 fill:#fef3c7,stroke:#f59e0b,color:#92400e
+    style RFB      fill:#ecfdf5,stroke:#10b981
+    style LSTMB    fill:#f5f3ff,stroke:#8b5cf6
+    style INF2     fill:#fef2f2,stroke:#ef4444
+  </div>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot dot-outside"></div> Outside package (user code)</div>
+    <div class="legend-item"><div class="legend-dot dot-rf"></div> Random Forest path</div>
+    <div class="legend-item"><div class="legend-dot dot-lstm"></div> LSTM path</div>
+    <div class="legend-item"><div class="legend-dot dot-infer"></div> Apply to new data</div>
+  </div>
+
+  <script>
+    mermaid.initialize({ startOnLoad: true, theme: 'default', flowchart: { curve: 'basis' } });
+  </script>
+</body>
+</html>
