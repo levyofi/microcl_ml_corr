@@ -67,7 +67,7 @@ for (loc in c("Ashkelon", "Range_24", "Rosh_HaNikra")) {
   lstm_model <- train_lstm(lstm_data$train_dict$X, lstm_data$train_dict$y,
                             lstm_data$val_dict$X,   lstm_data$val_dict$y,
                             n_units = 32, n_layers = 1, dropout = 0.0, lr = 0.005,
-                            epochs = 40, batch_size = 128, patience = 5, seed = SEED)
+                            epochs = 40, batch_size = 128, patience = 10, seed = SEED)
 
   # Step 6: Align test sets (keep only rows where the LSTM made a prediction)
   rf_test <- align_test_sets(test_loc, lstm_data$test_dict, lstm_data$index_info, SITE_COL)

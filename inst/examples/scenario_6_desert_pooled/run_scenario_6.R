@@ -61,7 +61,7 @@ lstm_model <- train_lstm(lstm_data$train_dict$X, lstm_data$train_dict$y,
                           lr         = 0.005,
                           epochs     = 20,     # fewer epochs than beach — desert patterns are simpler
                           batch_size = 256,    # larger batch to handle the bigger dataset efficiently
-                          patience   = 5,
+                          patience   = 10,
                           seed       = SEED)
 
 # ── Step 6: Align test sets ───────────────────────────────────────────────────

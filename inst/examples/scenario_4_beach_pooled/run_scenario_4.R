@@ -112,7 +112,7 @@ lstm_model <- train_lstm(
   lr         = 0.005, # learning rate: how quickly the network adjusts its weights
   epochs     = 40,    # maximum number of passes over the training data
   batch_size = 128,   # number of windows processed per weight update
-  patience   = 5,     # stop early if validation error has not improved for 5 epochs
+  patience   = 10,    # stop early if validation error has not improved for 10 epochs
   seed       = SEED
 )
 

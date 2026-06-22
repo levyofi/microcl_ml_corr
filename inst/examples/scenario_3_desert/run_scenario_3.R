@@ -31,10 +31,8 @@ SITE_COL <- "site_id"
 
 # Each task is one logger at the Tzeelim site.
 tasks <- list(
-  list(name = "Rock_S_T_2_W", site = "Rock_S_T_2_W", title = "Desert - Rock",
-       train_blocks = c(1, 3, 42), val_blocks = c(0), test_blocks = c(2)),
-  list(name = "Bush_S_T_2_W", site = "Bush_S_T_2_W", title = "Desert - Bush",
-       train_blocks = c(0,1,3,42,43,44,45,46,47,48,49,50), val_blocks = c(2), test_blocks = c(51))
+  list(name = "Rock_S_T_2_W", site = "Rock_S_T_2_W", title = "Desert - Rock"),
+  list(name = "Bush_S_T_2_W", site = "Bush_S_T_2_W", title = "Desert - Bush")
 )
 
 cat("=== Scenario 3: Desert Habitat ===\n")
@@ -53,14 +51,11 @@ for (task in tasks) {
 
   # ── Step 2: Split into train / validation / test ────────────────────────────
   splits <- split_train_val_test(data,
-                                  train_pct    = 0.75,
-                                  val_pct      = 0.125,
-                                  block_days   = 7,
-                                  use_blocks   = TRUE,
-                                  seed         = SEED,
-                                  train_blocks = task$train_blocks,
-                                  val_blocks   = task$val_blocks,
-                                  test_blocks  = task$test_blocks)
+                                  train_pct  = 0.75,
+                                  val_pct    = 0.125,
+                                  block_days = 7,
+                                  use_blocks = TRUE,
+                                  seed       = SEED)
   cat(sprintf("Train: %d | Validation: %d | Test: %d rows\n",
               nrow(splits$train), nrow(splits$val), nrow(splits$test)))
 
@@ -95,8 +90,8 @@ for (task in tasks) {
   cat("  Tuning LSTM hyperparameters...\n")
   hpo         <- lstm_hypertuning(lstm_2h$train_dict$X, lstm_2h$train_dict$y,
                                    lstm_2h$val_dict$X,   lstm_2h$val_dict$y,
-                                   n_trials = 3, epochs = 40, batch_size = 32,
-                                   patience = 5, seed = SEED)
+                                   n_trials = 5, epochs = 40, batch_size = 32,
+                                   patience = 10, seed = SEED)
   lstm_params <- hpo$params
 
   # ── Learning curve ──────────────────────────────────────────────────────────
@@ -126,7 +121,7 @@ for (task in tasks) {
                             lstm_2h$val_dict$X, lstm_2h$val_dict$y,
                             n_units = lstm_params$n_units, n_layers = lstm_params$n_layers,
                             dropout = lstm_params$dropout, lr = lstm_params$lr,
-                            epochs = 40, batch_size = 32, patience = 5, seed = run)
+                            epochs = 40, batch_size = 32, patience = 10, seed = run)
       m_lstm <- evaluate_correction(lstm_m, X_test_2h, y_test_lstm, base_test_lstm,
                                      model_type = "lstm")
       task_results[[length(task_results) + 1]] <- data.frame(
@@ -154,7 +149,7 @@ for (task in tasks) {
                             lstm_2h$val_dict$X,   lstm_2h$val_dict$y,
                             n_units = lstm_params$n_units, n_layers = lstm_params$n_layers,
                             dropout = lstm_params$dropout, lr = lstm_params$lr,
-                            epochs = 40, batch_size = 32, patience = 5, seed = SEED)
+                            epochs = 40, batch_size = 32, patience = 10, seed = SEED)
   lstm_preds <- base_test_lstm + predict(lstm_full, X_test_2h, verbose = 0)[, 1]
 
   plot_df <- head(data.frame(

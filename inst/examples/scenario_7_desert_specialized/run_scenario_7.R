@@ -57,7 +57,7 @@ for (region in c("Mishmar", "Tzeelim")) {
   lstm_model <- train_lstm(lstm_data$train_dict$X, lstm_data$train_dict$y,
                             lstm_data$val_dict$X,   lstm_data$val_dict$y,
                             n_units = 32, n_layers = 1, dropout = 0.0, lr = 0.005,
-                            epochs = 20, batch_size = 256, patience = 5, seed = SEED)
+                            epochs = 20, batch_size = 256, patience = 10, seed = SEED)
 
   # Step 6: Align test sets
   rf_test <- align_test_sets(test_reg, lstm_data$test_dict, lstm_data$index_info, SITE_COL)

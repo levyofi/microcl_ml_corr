@@ -41,14 +41,10 @@ RESULTS_DIR  <- file.path(SCENARIO_DIR, "results")
 dir.create(RESULTS_DIR, showWarnings = FALSE, recursive = TRUE)
 
 # Each "task" is one microhabitat logger at the Harod site.
-# train/val/test_blocks are pre-defined 7-day time blocks assigned to each role.
 tasks <- list(
-  list(name = "harod2_sun", site = "harod2_sun.csv", title = "Valley - Sun",
-       train_blocks = c(0,1,2,3,4,7), val_blocks = c(5), test_blocks = c(6)),
-  list(name = "harod2_shd", site = "harod2_shd.csv", title = "Valley - Shade",
-       train_blocks = c(0,1,2,3,4,7), val_blocks = c(5), test_blocks = c(6)),
-  list(name = "harod2_air", site = "harod2_air.csv", title = "Valley - Air",
-       train_blocks = c(0,1,2,3,4,7), val_blocks = c(5), test_blocks = c(6))
+  list(name = "harod2_sun", site = "harod2_sun.csv", title = "Valley - Sun"),
+  list(name = "harod2_shd", site = "harod2_shd.csv", title = "Valley - Shade"),
+  list(name = "harod2_air", site = "harod2_air.csv", title = "Valley - Air")
 )
 
 cat("=== Scenario 1: Valley Habitat ===\n")
@@ -70,18 +66,16 @@ for (task in tasks) {
   site_col <- "time_series_doc"
 
   # ── Step 2: Split into train / validation / test ────────────────────────────
-  # Rows are assigned to blocks of 7 consecutive days; those blocks are then
-  # allocated to train, val, or test. Using blocks (rather than random rows)
-  # prevents the model from "seeing the future" during training.
+  # Rows are assigned to blocks of 7 consecutive days, then blocks are randomly
+  # allocated 75% to train, 12.5% to validation, 12.5% to test.
+  # Using blocks (rather than random rows) prevents the model from "seeing the
+  # future" during training.
   splits <- split_train_val_test(data,
-                                  train_pct    = 0.75,
-                                  val_pct      = 0.125,
-                                  block_days   = 7,
-                                  use_blocks   = TRUE,
-                                  seed         = SEED,
-                                  train_blocks = task$train_blocks,
-                                  val_blocks   = task$val_blocks,
-                                  test_blocks  = task$test_blocks)
+                                  train_pct  = 0.75,
+                                  val_pct    = 0.125,
+                                  block_days = 7,
+                                  use_blocks = TRUE,
+                                  seed       = SEED)
 
   # ── Step 3: Select predictor columns ────────────────────────────────────────
   feature_cols <- get_feature_columns(splits$train)
@@ -122,10 +116,10 @@ for (task in tasks) {
   cat("  Tuning LSTM hyperparameters...\n")
   hpo         <- lstm_hypertuning(lstm_2h$train_dict$X, lstm_2h$train_dict$y,
                                    lstm_2h$val_dict$X,   lstm_2h$val_dict$y,
-                                   n_trials   = 3,
+                                   n_trials   = 5,
                                    epochs     = 40,
                                    batch_size = 32,
-                                   patience   = 5,
+                                   patience   = 10,
                                    seed       = SEED)
   lstm_params <- hpo$params   # best found configuration
 
@@ -166,7 +160,7 @@ for (task in tasks) {
                             lr         = lstm_params$lr,
                             epochs     = 40,
                             batch_size = 32,
-                            patience   = 5,
+                            patience   = 10,
                             seed       = run)
       m_lstm <- evaluate_correction(lstm_m, X_test_2h, y_test_lstm, base_test_lstm,
                                      model_type = "lstm")
@@ -198,7 +192,7 @@ for (task in tasks) {
                             n_layers   = lstm_params$n_layers,
                             dropout    = lstm_params$dropout,
                             lr         = lstm_params$lr,
-                            epochs     = 40, batch_size = 32, patience = 5,
+                            epochs     = 40, batch_size = 32, patience = 10,
                             seed       = SEED)
   lstm_preds <- base_test_lstm + predict(lstm_full, X_test_2h, verbose = 0)[, 1]
 

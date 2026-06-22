@@ -29,11 +29,6 @@ dir.create(RESULTS_DIR, showWarnings = FALSE, recursive = TRUE)
 SITE     <- "Ashkelon 15 m"   # the single logger used in this scenario
 SITE_COL <- "time_series_site"
 
-# Pre-defined 7-day block assignments for this logger
-TRAIN_BLOCKS <- c(0, 1, 3, 4, 5, 6, 7, 8, 9, 10)
-VAL_BLOCKS   <- c(11)
-TEST_BLOCKS  <- c(2)
-
 cat("=== Scenario 2: Beach Habitat (Ashkelon 15m) ===\n")
 
 # ── Step 1: Load data ─────────────────────────────────────────────────────────
@@ -50,14 +45,11 @@ data <- data[data[[SITE_COL]] == SITE &
 
 # ── Step 2: Split into train / validation / test ───────────────────────────────
 splits <- split_train_val_test(data,
-                                train_pct    = 0.75,
-                                val_pct      = 0.125,
-                                block_days   = 7,
-                                use_blocks   = TRUE,
-                                seed         = SEED,
-                                train_blocks = TRAIN_BLOCKS,
-                                val_blocks   = VAL_BLOCKS,
-                                test_blocks  = TEST_BLOCKS)
+                                train_pct  = 0.75,
+                                val_pct    = 0.125,
+                                block_days = 7,
+                                use_blocks = TRUE,
+                                seed       = SEED)
 cat(sprintf("Train: %d | Validation: %d | Test: %d rows\n",
             nrow(splits$train), nrow(splits$val), nrow(splits$test)))
 
@@ -92,8 +84,8 @@ rf_params <- list(max.depth     = rf_tuned$max.depth,
 cat("  Tuning LSTM hyperparameters...\n")
 hpo         <- lstm_hypertuning(lstm_2h$train_dict$X, lstm_2h$train_dict$y,
                                  lstm_2h$val_dict$X,   lstm_2h$val_dict$y,
-                                 n_trials = 3, epochs = 40, batch_size = 32,
-                                 patience = 5, seed = SEED)
+                                 n_trials = 5, epochs = 40, batch_size = 32,
+                                 patience = 10, seed = SEED)
 lstm_params <- hpo$params
 
 # ── Learning curve ────────────────────────────────────────────────────────────
@@ -123,7 +115,7 @@ for (n_days in TRAINING_DAYS) {
                           lstm_2h$val_dict$X, lstm_2h$val_dict$y,
                           n_units = lstm_params$n_units, n_layers = lstm_params$n_layers,
                           dropout = lstm_params$dropout, lr = lstm_params$lr,
-                          epochs = 40, batch_size = 32, patience = 5, seed = run)
+                          epochs = 40, batch_size = 32, patience = 10, seed = run)
     m_lstm <- evaluate_correction(lstm_m, X_test_2h, y_test_lstm, base_test_lstm,
                                    model_type = "lstm")
     lc_results[[length(lc_results) + 1]] <- data.frame(
@@ -148,7 +140,7 @@ lstm_full  <- train_lstm(lstm_2h$train_dict$X, lstm_2h$train_dict$y,
                           lstm_2h$val_dict$X,   lstm_2h$val_dict$y,
                           n_units = lstm_params$n_units, n_layers = lstm_params$n_layers,
                           dropout = lstm_params$dropout, lr = lstm_params$lr,
-                          epochs = 40, batch_size = 32, patience = 5, seed = SEED)
+                          epochs = 40, batch_size = 32, patience = 10, seed = SEED)
 lstm_preds <- base_test_lstm + predict(lstm_full, X_test_2h, verbose = 0)[, 1]
 
 plot_df <- head(data.frame(
