@@ -1,155 +1,127 @@
-# microclCorr: Machine Learning Correction of Microclimate Model Predictions
+# microclCorr: Correcting Microclimate Model Predictions with Machine Learning
 
 [![R-CMD-check](https://img.shields.io/badge/R--CMD--check-passing-brightgreen.svg)](https://github.com/levyofi/microcl_ml_corr)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-The `microclCorr` R package provides a robust, production-grade machine learning pipeline to correct systematic biases in physical microclimate models (such as **NicheMapR**) using temperature logger measurements. 
+`microclCorr` is an R package that improves the accuracy of microclimate temperature predictions produced by physical models such as **NicheMapR**.
 
-By combining physical microclimatic baseline simulations with Random Forests (`ranger`) and sequential Deep Learning models (`keras3` / `tensorflow`), `microclCorr` reduces simulation errors by **80% to 94%** across diverse Mediterranean, coastal, and desert environments.
+Physical models like NicheMapR simulate temperatures based on solar radiation, wind, and terrain, but they are not perfect — there is always a gap between the model's prediction and what a field temperature logger actually records. `microclCorr` learns to predict and correct that gap using machine learning, reducing prediction errors by **58% to 90%** across Mediterranean, coastal, and desert environments.
 
 ---
 
-## Key Features
+## How it works
 
-- **Data Preprocessing & Scaling**: Robust datetime alignment (enforcing UTC), index matching, and sequence windowing.
-- **Sequential Deep Learning**: Fully integrated LSTM networks for correction of temporal lag and shadow geometries.
-- **Robust Random Forests**: Fast out-of-bag correction using optimized `ranger` ensembles.
-- **Spatial Generalization Scenarios**: Built-in support for Pooled (multi-site) and Specialized (local) training pipelines.
-- **Zero-Shot Spatial Transfer**: Capabilities to transfer corrections to unseen locations using neighboring site data.
-- **Automated Hyperparameter Optimization (HPO)**: Grid search and keras-based validation tuning.
+NicheMapR predicts a temperature. A field logger measures the actual temperature. The difference between the two is called the **residual**:
+
+```
+residual = measured temperature − NicheMapR prediction
+```
+
+`microclCorr` trains a model to predict that residual. The corrected temperature is then:
+
+```
+corrected temperature = NicheMapR prediction + predicted residual
+```
+
+Two model types are available and compared:
+
+- **Random Forest** — an ensemble of decision trees. Fast, robust, and works well even with small datasets.
+- **LSTM** — a neural network designed for time-series data. Uses the past 2 hours of measurements to predict the current residual.
 
 ---
 
 ## Workflow
 
-The diagram below shows the full pipeline from raw input files to corrected predictions. The two pre-processing paths (single logger vs. multiple loggers) merge into a shared ML workflow. Steps that differ for the multiple-logger case are marked with ⚠️.
+The diagram below shows the full pipeline from raw CSV files to corrected predictions.
 
 ![microclCorr workflow](vignettes/workflow_combined.png)
 
-The interactive version with both tabs is available at [`vignettes/workflow_diagram.html`](vignettes/workflow_diagram.html).
+An interactive version is available at [`vignettes/workflow_diagram.html`](vignettes/workflow_diagram.html).
 
-**Input files required:**
-- **Logger data CSV** — measured temperatures, timestamps, microhabitat label, and any environmental covariates
-- **NicheMapR predictions CSV** — model-predicted temperatures and environmental features at the same location and times
+**What you need to provide:**
+- A **logger data CSV** — measured temperatures, timestamps, microhabitat label, and environmental variables
+- A **NicheMapR predictions CSV** — model-predicted temperatures for the same location and time period
 
-**Key steps outside the package (user responsibility):**
-1. Align both files by timestamp and compute `residual = measured − predicted`
-2. *(Multiple loggers only)* Add a microhabitat column if not present, a site ID column (e.g. `Site_ID` with values like `"Mishmar River"`), then stack all logger tables into one file
+**Your only pre-processing step** (done outside the package):
+1. Join both files by timestamp and add a `residual` column (measured − predicted)
+2. *(If using multiple loggers)* Add a microhabitat column if not already present, add a site ID column (e.g. `Site_ID` with values like `"Mishmar River"`), then stack all logger tables into one file
+
+See the [preprocessing examples](inst/examples/preprocessing_examples/) for ready-to-run scripts that demonstrate this step on real data.
 
 ---
 
-## Installation Instructions
+## Installation
 
-You can install `microclCorr` directly from GitHub.
-
-### 1. Install System and R Dependencies
-
-Before installing, ensure you have a functional R environment (>= 4.0.0). Open R and run:
+### 1. Install the package
 
 ```R
 # Install devtools if you haven't already
-if (!requireNamespace("devtools", quietly = TRUE)) {
-  install.packages("devtools")
-}
+if (!requireNamespace("devtools", quietly = TRUE)) install.packages("devtools")
 
-# Install core CRAN dependencies
-install.packages(c("dplyr", "lubridate", "ranger", "data.table", "reticulate"))
-```
-
-### 2. Install the Package from GitHub
-
-Install the package directly from the repository:
-
-```R
 devtools::install_github("levyofi/microcl_ml_corr")
 ```
 
-### 3. Configure TensorFlow & Keras Backend (For LSTM Models)
+### 2. Install core dependencies
 
-The sequential deep learning models rely on the Python `tensorflow` backend. We recommend configuring a dedicated Conda/Mamba environment:
+```R
+install.packages(c("ranger", "reticulate"))
+```
+
+### 3. Set up TensorFlow (required for LSTM models only)
+
+The LSTM model uses Python's TensorFlow library under the hood. To set it up:
+
+```R
+library(keras3)
+install_keras()   # automatically installs TensorFlow in a virtual environment
+```
+
+If you already have a conda environment with TensorFlow installed, point R to it:
 
 ```R
 library(reticulate)
-
-# Option A: Automatic installation via keras3 (creates a conda/virtualenv)
-library(keras3)
-install_keras()
-
-# Option B: Link to an existing conda environment containing TensorFlow (Recommended for GPU support)
-# Replace the path with your conda/mamba environment location
-use_condaenv("microclimate_gpu", required = TRUE)
+use_condaenv("your_env_name", required = TRUE)
 ```
 
 ---
 
-## Quick Start Example: Local Correction
+## Examples
 
-Below is a simple example showing how to train a Random Forest correction model on a single location:
+The package includes eight fully worked examples in [`inst/examples/`](inst/examples/), each answering a different practical question:
 
-```R
-library(microclCorr)
-library(ranger)
+| Scenario | Question answered |
+|----------|-----------------|
+| [Preprocessing](inst/examples/preprocessing_examples/) | How do I prepare my CSV files before running the pipeline? |
+| [1 — Valley](inst/examples/scenario_1_valley/) | How well does local correction work? How much logger data do I need? |
+| [2 — Beach](inst/examples/scenario_2_beach/) | Same as above for a coastal site, where NicheMapR errors are larger. |
+| [3 — Desert](inst/examples/scenario_3_desert/) | Same as above for a desert site, where even 1–2 days of data is enough. |
+| [4 — Beach Pooled](inst/examples/scenario_4_beach_pooled/) | Does training on ALL loggers at once improve accuracy? |
+| [5 — Beach Specialized](inst/examples/scenario_5_beach_specialized/) | Does training one model per location beat a single pooled model? |
+| [6 — Desert Pooled](inst/examples/scenario_6_desert_pooled/) | Same as Scenario 4, but across 48 desert loggers. |
+| [7 — Desert Specialized](inst/examples/scenario_7_desert_specialized/) | Same as Scenario 5, but per desert region. |
+| [8 — Zero-Shot Transfer](inst/examples/scenario_8_zero_shot_transfer/) | Can the package correct a site where no logger data exists at all? |
 
-# 1. Load your preprocessed logger data
-# Columns required: 'time', 'predicted' (physical model), 'residual' (measured - predicted), and features
-data_path <- system.file("extdata", "Harod_dataset.csv", package = "microclCorr")
-data <- load_prepared_csv_data(data_path, is_continuous_microhabitat = FALSE)
+Each example is a self-contained R script with plain-English comments throughout. To run an example, open the corresponding `run_scenario_N.R` file in RStudio and click **Source**.
 
-# 2. Split data into train, validation, and test blocks (e.g. 7-day blocks)
-splits <- split_train_val_test(
-  data, 
-  train_pct = 0.75, 
-  val_pct = 0.125, 
-  block_days = 7, 
-  use_blocks = TRUE, 
-  seed = 42
-)
-
-# 3. Identify physical features for training
-features <- get_feature_columns(splits$train)
-
-# 4. Train a Random Forest Correction Model
-rf_model <- ranger::ranger(
-  x = splits$train[, features, drop = FALSE],
-  y = splits$train$residual,
-  num.trees = 500,
-  seed = 42
-)
-
-# 5. Correct predictions on the test set
-test_X <- splits$test[, features, drop = FALSE]
-predicted_residuals <- predict(rf_model, data = test_X)$predictions
-corrected_predictions <- splits$test$predicted + predicted_residuals
-
-# 6. Evaluate error reduction
-rmse_base <- sqrt(mean(splits$test$residual^2))
-rmse_corrected <- sqrt(mean((splits$test$residual - predicted_residuals)^2))
-cat(sprintf("Baseline RMSE: %.3f°C\nCorrected RMSE: %.3f°C\n", rmse_base, rmse_corrected))
-```
+See the [examples README](inst/examples/README.md) for a summary of results across all scenarios.
 
 ---
 
-## Package Scenarios & Examples
+## Key results
 
-The package contains self-contained executable scenarios in `inst/examples/`:
+| Scenario | RF RMSE (°C) | LSTM RMSE (°C) | Improvement over NicheMapR |
+|----------|-------------|----------------|---------------------------|
+| 1 — Valley (single logger) | 2.69 | 2.34 | 58–61% |
+| 2 — Beach (single logger) | 3.06 | 4.04 | 51–63% |
+| 3 — Desert (single logger) | 1.88 | 2.28 | 69–74% |
+| 4 — Beach Pooled | 0.88 | 2.09 | 75–90% |
+| 6 — Desert Pooled | ~1.04 | ~1.51 | ~83–88% |
+| 8 — Zero-Shot (no local data) | ~3.0 | — | ~64% |
 
-- **Scenario 1**: Mediterranean Valley Habitat (Harod Local Correction)
-- **Scenario 2**: Beach Habitat (Local Correction)
-- **Scenario 3**: Judean Desert (Local Correction)
-- **Scenario 4**: Beach Pooled Spatial Generalization
-- **Scenario 5**: Beach Specialized Location-Specific Models
-- **Scenario 6**: Desert Pooled Spatial Generalization (48 loggers)
-- **Scenario 7**: Desert Specialized Models
-- **Scenario 8**: Zero-Shot Spatial Transfer (Training on nearby sites to correct a new site)
-
-To run any scenario, you can source the script directly:
-```R
-# Run Scenario 8: Zero-Shot Transfer
-source(system.file("examples", "scenario_8_zero_shot_transfer", "run_scenario_8.R", package = "microclCorr"))
-```
+Random Forest tends to outperform LSTM on small single-logger datasets. With larger pooled datasets the gap narrows. Even with no local data at all (Scenario 8), the model reduces NicheMapR error by ~64%.
 
 ---
 
 ## License
 
-This package is licensed under the MIT License. See the `LICENSE` file for details.
+This package is licensed under the MIT License. See the [`LICENSE`](LICENSE) file for details.
