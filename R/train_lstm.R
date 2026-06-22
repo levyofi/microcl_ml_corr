@@ -137,7 +137,7 @@ train_lstm <- function(train_X, train_y,
 #' @param patience Early stopping patience
 #' @param seed Random seed
 #' @return List with best_model and best_params
-#' @keywords internal
+#' @export
 lstm_hypertuning <- function(train_X, train_y, val_X, val_y,
                              n_trials = 5,
                              units_range = c(32, 512),

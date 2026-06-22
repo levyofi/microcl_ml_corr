@@ -7,7 +7,7 @@ making this a more challenging correction target than inland habitats.
 ## Run
 
 ```r
-source(system.file("examples", "scenario_2_beach", "run_scenario_2.R", package = "microclCorr"))
+source(system.file("examples", "scenario_2_beach_single_logger", "run_scenario_2.R", package = "microclCorr"))
 ```
 
 ## Input

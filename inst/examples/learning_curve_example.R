@@ -172,7 +172,7 @@ print(lc$summary[, c("model", "n_days", "rmse_corr", "sd_corr")])
 # The ribbon around each line shows ±1 SD across the 5 repeated runs.
 # The dashed horizontal lines mark the 10% tolerance threshold for each model.
 ggsave(
-  file.path("inst", "examples", "scenario_1_valley", "learning_curve_shade.png"),
+  file.path("inst", "examples", "scenario_1_valley_single_logger", "learning_curve_shade.png"),
   lc$plot,
   width = 8, height = 5, dpi = 300
 )

@@ -46,9 +46,9 @@ examples/
 │   ├── preprocessing_multiple_loggers.R
 │   └── data/                      ← example input CSVs
 │
-├── scenario_1_valley/             ← Single logger, Mediterranean valley
-├── scenario_2_beach/              ← Single logger, coastal beach
-├── scenario_3_desert/             ← Single logger, Judean desert
+├── scenario_1_valley_single_logger/             ← Single logger, Mediterranean valley
+├── scenario_2_beach_single_logger/              ← Single logger, coastal beach
+├── scenario_3_desert_single_logger/             ← Single logger, Judean desert
 ├── scenario_4_beach_pooled/       ← All beach loggers pooled into one model
 ├── scenario_5_beach_specialized/  ← One model per coastal location
 ├── scenario_6_desert_pooled/      ← All 48 desert loggers pooled
@@ -70,7 +70,7 @@ Open any `run_scenario_N.R` file in RStudio and click **Source**, or run from
 the repository root:
 
 ```r
-source("inst/examples/scenario_1_valley/run_scenario_1.R")
+source("inst/examples/scenario_1_valley_single_logger/run_scenario_1.R")
 ```
 
 All input data is bundled with the package and located automatically via

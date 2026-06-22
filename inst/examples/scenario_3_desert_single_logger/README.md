@@ -8,7 +8,7 @@ making them the easiest habitat for the correction models.
 ## Run
 
 ```r
-source(system.file("examples", "scenario_3_desert", "run_scenario_3.R", package = "microclCorr"))
+source(system.file("examples", "scenario_3_desert_single_logger", "run_scenario_3.R", package = "microclCorr"))
 ```
 
 ## Input

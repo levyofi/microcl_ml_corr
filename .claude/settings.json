@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /Users/ofir/Dropbox/Antigravity/NichMapR_ml_corr/microcl_ml_corr add DESCRIPTION NAMESPACE R/evaluate.R R/predict.R R/train_rf.R scripts/run_phase1_loggers.R scripts/validate_full.R scripts/validate_rf.R man/)",
+      "Bash(git -C /Users/ofir/Dropbox/Antigravity/NichMapR_ml_corr/microcl_ml_corr commit -m ' *)",
+      "Bash(git -C /Users/ofir/Dropbox/Antigravity/NichMapR_ml_corr/microcl_ml_corr push origin main)",
+      "Bash(Rscript -e ' *)",
+      "Bash('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless=new --disable-gpu --no-sandbox --window-size=1600,2800 --force-device-scale-factor=2 --screenshot=/Users/ofir/Dropbox/Antigravity/NichMapR_ml_corr/microcl_ml_corr/vignettes/workflow_pooled.png file:///Users/ofir/Dropbox/Antigravity/NichMapR_ml_corr/microcl_ml_corr/vignettes/_export_pooled.html)",
+      "Bash('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --headless=new --disable-gpu --no-sandbox --window-size=2200,3200 --force-device-scale-factor=2 --screenshot=/Users/ofir/Dropbox/Antigravity/NichMapR_ml_corr/microcl_ml_corr/vignettes/workflow_combined.png file:///Users/ofir/Dropbox/Antigravity/NichMapR_ml_corr/microcl_ml_corr/vignettes/_export_combined.html)",
+      "Bash(open /Users/ofir/Dropbox/Antigravity/NichMapR_ml_corr/microcl_ml_corr/vignettes/workflow_diagram.html)",
+      "Bash(pdflatex -interaction=nonstopmode workflow_figures.tex)",
+      "Bash(open workflow_figures.pdf)",
+      "Bash(open /Users/ofir/Dropbox/Antigravity/NichMapR_ml_corr/microcl_ml_corr/vignettes/workflow_figures.pdf)",
+      "Bash(brew install *)",
+      "Bash(git commit -m ' *)",
+      "Bash(Rscript -e \"library\\(microclCorr\\)\")"
+    ]
+  }
+}

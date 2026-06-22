@@ -7,7 +7,7 @@ and used to correct NicheMapR temperature predictions.
 ## Run
 
 ```r
-source(system.file("examples", "scenario_1_valley", "run_scenario_1.R", package = "microclCorr"))
+source(system.file("examples", "scenario_1_valley_single_logger", "run_scenario_1.R", package = "microclCorr"))
 ```
 
 ## Input

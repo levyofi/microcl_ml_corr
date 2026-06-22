@@ -94,9 +94,9 @@ The package includes eight fully worked examples in [`inst/examples/`](inst/exam
 | Scenario | Question answered |
 |----------|-----------------|
 | [Preprocessing](inst/examples/preprocessing_examples/) | How do I prepare my CSV files before running the pipeline? |
-| [1 — Valley](inst/examples/scenario_1_valley/) | How well does local correction work? How much logger data do I need? |
-| [2 — Beach](inst/examples/scenario_2_beach/) | Same as above for a coastal site, where NicheMapR errors are larger. |
-| [3 — Desert](inst/examples/scenario_3_desert/) | Same as above for a desert site, where even 1–2 days of data is enough. |
+| [1 — Valley](inst/examples/scenario_1_valley_single_logger/) | How well does local correction work? How much logger data do I need? |
+| [2 — Beach](inst/examples/scenario_2_beach_single_logger/) | Same as above for a coastal site, where NicheMapR errors are larger. |
+| [3 — Desert](inst/examples/scenario_3_desert_single_logger/) | Same as above for a desert site, where even 1–2 days of data is enough. |
 | [4 — Beach Pooled](inst/examples/scenario_4_beach_pooled/) | Does training on ALL loggers at once improve accuracy? |
 | [5 — Beach Specialized](inst/examples/scenario_5_beach_specialized/) | Does training one model per location beat a single pooled model? |
 | [6 — Desert Pooled](inst/examples/scenario_6_desert_pooled/) | Same as Scenario 4, but across 48 desert loggers. |

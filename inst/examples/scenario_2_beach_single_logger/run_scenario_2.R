@@ -40,7 +40,7 @@ SITE     <- "Ashkelon 15 m"
 SITE_COL <- "time_series_site"   # column that identifies each logger
 
 DATA_PATH    <- system.file("extdata", "Beach_data_preprocessed.csv", package = "microclCorr")
-SCENARIO_DIR <- file.path("inst", "examples", "scenario_2_beach")
+SCENARIO_DIR <- file.path("inst", "examples", "scenario_2_beach_single_logger")
 RESULTS_DIR  <- file.path(SCENARIO_DIR, "results")
 dir.create(RESULTS_DIR, showWarnings = FALSE, recursive = TRUE)
 

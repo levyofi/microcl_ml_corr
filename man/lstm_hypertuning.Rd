@@ -53,4 +53,3 @@ List with best_model and best_params
 \description{
 Performs a simple random search over LSTM hyperparameters.
 }
-\keyword{internal}
