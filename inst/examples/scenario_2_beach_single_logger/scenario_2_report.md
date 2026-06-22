@@ -20,3 +20,10 @@ RF outperforms LSTM at this training set size. Both achieve large improvements o
 the NicheMapR baseline (~79–88%), demonstrating that even a single beach logger
 provides sufficient signal to substantially reduce coastal microclimate errors.
 To find the minimum number of training days needed, run `learning_curve_example.R`.
+
+---
+
+> **Note on reproducibility:** Results depend on the random 75/12.5/12.5 block split and on the
+> random initialisation of the LSTM weights. Re-running the script with a different `SEED` value,
+> or on a different machine, will produce slightly different numbers. The direction of the results
+> (which model performs better, approximate improvement %) is stable across runs.

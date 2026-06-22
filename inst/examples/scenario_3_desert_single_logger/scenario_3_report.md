@@ -21,3 +21,10 @@ RF and LSTM perform comparably on average (~71% improvement each), with RF leadi
 and LSTM leading on Bush. The NicheMapR baseline error is large (~6.4 °C) due to complex
 rock and bush surface energy balance; both models correct it substantially.
 To find the minimum number of training days needed, run `learning_curve_example.R`.
+
+---
+
+> **Note on reproducibility:** Results depend on the random 75/12.5/12.5 block split and on the
+> random initialisation of the LSTM weights. Re-running the script with a different `SEED` value,
+> or on a different machine, will produce slightly different numbers. The direction of the results
+> (which model performs better, approximate improvement %) is stable across runs.

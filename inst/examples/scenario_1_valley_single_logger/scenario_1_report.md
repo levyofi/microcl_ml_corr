@@ -22,3 +22,10 @@ RF and LSTM perform comparably across microhabitats, with RF having a slight edg
 while LSTM is marginally better on Air. NicheMapR error is largest for the Sun microhabitat (direct
 solar exposure), where both models still achieve ~50% improvement.
 To find the minimum number of training days needed, run `learning_curve_example.R`.
+
+---
+
+> **Note on reproducibility:** Results depend on the random 75/12.5/12.5 block split and on the
+> random initialisation of the LSTM weights. Re-running the script with a different `SEED` value,
+> or on a different machine, will produce slightly different numbers. The direction of the results
+> (which model performs better, approximate improvement %) is stable across runs.
