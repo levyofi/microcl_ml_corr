@@ -5,7 +5,9 @@
 
 `microclCorr` is an R package that improves the accuracy of microclimate temperature predictions produced by physical models such as **NicheMapR**.
 
-Physical models like NicheMapR simulate temperatures based on solar radiation, wind, and terrain, but they are not perfect — there is always a gap between the model's prediction and what a field temperature logger actually records. `microclCorr` learns to predict and correct that gap using machine learning, reducing prediction errors by **58% to 90%** across Mediterranean, coastal, and desert environments.
+Physical models like NicheMapR are fundamental tools for understanding how species interact with their thermal environment. By simulating temperatures from first principles — solar radiation, wind, terrain geometry, and heat transfer — they provide mechanistic insight that purely statistical approaches cannot. However, in microhabitats with complex heat balance conditions not yet fully captured by current physical models — such as coastal beaches, where marine winds and sea surface temperatures create rapidly changing microclimates — a residual gap remains between model predictions and field measurements.
+
+`microclCorr` bridges that gap using machine learning. Rather than modifying or replacing the physical model, it learns to predict and correct the residual error from a small set of temperature logger measurements. This eliminates the need to manually re-parameterise the physical model for each specific microhabitat, reducing prediction errors by **58% to 90%** across Mediterranean, coastal, and desert environments.
 
 ---
 
