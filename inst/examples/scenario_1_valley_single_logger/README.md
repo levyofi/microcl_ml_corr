@@ -20,12 +20,12 @@ source(system.file("examples", "scenario_1_valley_single_logger", "run_scenario_
 
 | File | Description |
 |------|-------------|
-| `results/` | CSV with RMSE and R² before and after correction |
+| `results/` | Per-microhabitat CSV with RMSE before and after correction |
 | `prediction_examples_valley.png` | 120-hour observed vs. corrected predictions |
-| `learning_curves_valley.png` | RMSE as a function of training data size |
 | `scenario_1_report.md` | Full results report |
 
 ## Key result
 
-RMSE reduced from ~7.3 °C (NicheMapR baseline) to ~2.3 °C (LSTM) and ~2.7 °C (RF),
-an improvement of roughly 58–61%.
+Average RMSE across microhabitats reduced from ~5.2 °C (NicheMapR) to ~2.6 °C (RF, 42%)
+and ~2.9 °C (LSTM, 39%). RF leads on Sun and Shade; LSTM leads on Air.
+To explore how many days of data are needed, run `learning_curve_example.R`.

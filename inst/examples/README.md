@@ -103,9 +103,9 @@ All values at 42 days of training data where applicable. RMSE in °C; lower is b
 
 | Scenario | RF RMSE | RF improvement | LSTM RMSE | LSTM improvement |
 |----------|---------|---------------|-----------|-----------------|
-| 1 — Valley (single logger) | 2.69 | 58% | 2.34 | 61% |
-| 2 — Beach (single logger) | 3.06 | 63% | 4.04 | 51% |
-| 3 — Desert (single logger) | 1.88 | 74% | 2.28 | 69% |
+| 1 — Valley (single logger, avg across microhabitats) | 2.59 | 42% | 2.88 | 39% |
+| 2 — Beach (single logger) | 1.40 | 88% | 2.50 | 79% |
+| 3 — Desert (single logger, avg across microhabitats) | 1.87 | 71% | 1.89 | 71% |
 | 4 — Beach Pooled (13,988 train rows) | 0.88 | 90% | 2.09 | 75% |
 | 5 — Beach Specialized (4,631–4,893 rows/location) | ~0.84 | ~90% | ~1.87 | ~77% |
 | 6 — Desert Pooled (118,753 train rows) | ~1.04 | ~88% | ~1.51 | ~83% |

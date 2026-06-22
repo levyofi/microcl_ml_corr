@@ -1,24 +1,23 @@
 # Scenario 3: Judean Desert Habitat (Tzeelim) Report
 
-This example details the microclimate correction model behavior for the Judean Desert habitat (Tzeelim Winter), featuring microclimatic measurements under a Desert Bush and on a Desert Rock.
+Local correction models trained on two microhabitats (Rock, Bush) at the Tzeelim desert site.
+Split: 75% train / 12.5% validation / 12.5% test (random 7-day blocks). Full training set used.
 
 ## 1. Example Predictions (120 Hours)
-The plot below compares predictions and observed temperatures:
 
 ![Desert predictions example](prediction_examples_desert.png)
 
-## 2. Performance Comparison Table
-Below is the performance achieved on the desert loggers when trained on 42 days of data:
+## 2. Performance at Full Training Data
 
-| Microhabitat | Baseline NicheMapR RMSE (°C) | LSTM (2h) RMSE (°C) | LSTM (2h) Imp (%) | RF RMSE (°C) | RF Imp (%) |
+| Microhabitat | Baseline NicheMapR RMSE (°C) | RF RMSE (°C) | RF Imp (%) | LSTM (2h) RMSE (°C) | LSTM (2h) Imp (%) |
 | --- | --- | --- | --- | --- | --- |
-| ALL | 7.219 | 2.275 | 68.5% | 1.884 | 73.9% |
+| Rock  | 6.536 | 1.657 | 74.6% | 2.156 | 67.0% |
+| Bush  | 6.344 | 2.090 | 67.1% | 1.619 | 74.5% |
+| **Average** | **6.440** | **1.873** | **70.9%** | **1.888** | **70.7%** |
 
+## 3. Key Takeaway
 
-## 3. Learning Curves (Training Size Optimization)
-We analyzed how training data volume impacts desert predictions:
-
-![Desert learning curves](learning_curves_desert.png)
-
-* **Key Takeaway**: In the desert habitat, extremely small amounts of training data (as little as **1 day**) capture >90% of the maximum improvement. This reflects the high daily meteorological consistency of desert environments.
-
+RF and LSTM perform comparably on average (~71% improvement each), with RF leading on Rock
+and LSTM leading on Bush. The NicheMapR baseline error is large (~6.4 °C) due to complex
+rock and bush surface energy balance; both models correct it substantially.
+To find the minimum number of training days needed, run `learning_curve_example.R`.

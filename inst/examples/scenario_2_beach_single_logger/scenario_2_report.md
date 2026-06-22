@@ -1,25 +1,22 @@
-# Scenario 2: Coastal Beach Habitat (Ashkelon) Report
+# Scenario 2: Coastal Beach Habitat (Ashkelon 15 m) Report
 
-This example details the microclimate correction model behavior for a coastal Beach habitat (Ashkelon 15m logger) where microclimatic conditions are heavily modulated by marine winds and sea temperatures.
+Local correction model trained on a single beach logger (Ashkelon 15 m).
+Split: 75% train / 12.5% validation / 12.5% test (random 7-day blocks). Full training set used.
 
 ## 1. Example Predictions (120 Hours)
-The plot below compares predictions and observed temperatures:
 
 ![Beach predictions example](prediction_examples_beach.png)
 
-## 2. Performance Comparison Table
-Below is the performance achieved on the beach logger when trained on 42 days of data:
+## 2. Performance at Full Training Data
 
-| Model | Baseline NicheMapR RMSE (°C) | Corrected RMSE (°C) | Error Reduction (%) |
+| Model | Baseline NicheMapR RMSE (°C) | Corrected RMSE (°C) | Improvement (%) |
 | --- | --- | --- | --- |
-| LSTM_2h | 8.186 | 4.036 | 50.7% |
-| RF | 8.186 | 3.061 | 62.6% |
+| RF      | 11.946 | 1.399 | 88.3% |
+| LSTM_2h | 11.946 | 2.501 | 79.1% |
 
+## 3. Key Takeaway
 
-## 3. Learning Curves (Training Size Optimization)
-We analyzed how training data volume impacts coastal prediction:
-
-![Beach learning curves](learning_curves_beach.png)
-
-* **Key Takeaway**: Coastal beach habitats require at least **28 days** of training data to model the wind/tide weather dynamics effectively, showing higher dataset size dependency.
-
+RF outperforms LSTM at this training set size. Both achieve large improvements over
+the NicheMapR baseline (~79–88%), demonstrating that even a single beach logger
+provides sufficient signal to substantially reduce coastal microclimate errors.
+To find the minimum number of training days needed, run `learning_curve_example.R`.

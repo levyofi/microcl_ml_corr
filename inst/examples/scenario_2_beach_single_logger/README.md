@@ -22,10 +22,10 @@ source(system.file("examples", "scenario_2_beach_single_logger", "run_scenario_2
 |------|-------------|
 | `results/` | CSV with RMSE and R² before and after correction |
 | `prediction_examples_beach.png` | 120-hour observed vs. corrected predictions |
-| `learning_curves_beach.png` | RMSE as a function of training data size |
 | `scenario_2_report.md` | Full results report |
 
 ## Key result
 
-RMSE reduced from ~8.2 °C (NicheMapR baseline) to ~3.1 °C (RF) and ~4.0 °C (LSTM).
-At least 28 days of training data are needed to capture coastal wind and tide dynamics.
+RMSE reduced from ~11.9 °C (NicheMapR baseline) to ~1.4 °C (RF, 88%) and ~2.5 °C (LSTM, 79%).
+RF outperforms LSTM at this training set size.
+To explore how many days of data are needed, run `learning_curve_example.R`.

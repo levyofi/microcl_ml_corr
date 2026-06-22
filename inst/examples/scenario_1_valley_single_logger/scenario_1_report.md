@@ -1,24 +1,24 @@
 # Scenario 1: Mediterranean Valley Habitat (Harod) Report
 
-This example demonstrates local logger microclimate correction in a Mediterranean Valley habitat using physical model baselines (NicheMapR) coupled with Random Forest (`ranger`) and sequential LSTM (`keras3`) models.
+Local correction models trained on three microhabitats (Sun, Shade, Air) at the Harod valley site.
+Split: 75% train / 12.5% validation / 12.5% test (random 7-day blocks). Full training set used.
 
 ## 1. Example Predictions (120 Hours)
-The following plot shows the test set ground truth (Observed) vs. NicheMapR physical simulation, compared to machine learning corrected outputs:
 
 ![Valley predictions example](prediction_examples_valley.png)
 
-## 2. Performance Comparison Table
-Below is the test set correction performance when trained on the full 42 days of available training data:
+## 2. Performance at Full Training Data
 
-| Microhabitat | Baseline NicheMapR RMSE (°C) | LSTM (2h) RMSE (°C) | LSTM (2h) Imp (%) | RF RMSE (°C) | RF Imp (%) |
+| Microhabitat | Baseline NicheMapR RMSE (°C) | RF RMSE (°C) | RF Imp (%) | LSTM (2h) RMSE (°C) | LSTM (2h) Imp (%) |
 | --- | --- | --- | --- | --- | --- |
-| ALL | 7.284 | 2.338 | 60.5% | 2.689 | 57.9% |
+| Sun   | 8.169 | 3.484 | 57.3% | 4.083 | 50.0% |
+| Shade | 5.530 | 2.828 | 48.9% | 3.220 | 41.8% |
+| Air   | 1.792 | 1.466 | 18.2% | 1.341 | 25.1% |
+| **Average** | **5.164** | **2.593** | **41.5%** | **2.881** | **38.9%** |
 
+## 3. Key Takeaway
 
-## 3. Learning Curves (Training Size Optimization)
-We analyzed how training data volume impacts performance:
-
-![Valley learning curves](learning_curves_valley.png)
-
-* **Key Takeaway**: A training size of **28 days** recovers >90% of the maximum improvement. The plateau is due to the chronological size constraints of the block splits.
-
+RF and LSTM perform comparably across microhabitats, with RF having a slight edge on Sun and Shade,
+while LSTM is marginally better on Air. NicheMapR error is largest for the Sun microhabitat (direct
+solar exposure), where both models still achieve ~50% improvement.
+To find the minimum number of training days needed, run `learning_curve_example.R`.
