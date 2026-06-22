@@ -99,17 +99,21 @@ Scenarios 2, 3, 5, 6, 7 follow the same pattern as 1 and 4.
 
 ## Key findings across scenarios
 
-| Scenario | RF RMSE (°C) | Improvement over NicheMapR |
-|----------|-------------|---------------------------|
-| 1 — Valley (single logger, 42 days) | 2.69 | 58% |
-| 2 — Beach (single logger, 42 days) | 3.06 | 63% |
-| 3 — Desert (single logger, 42 days) | 1.88 | 74% |
-| 4 — Beach Pooled (13,988 train rows) | 0.88 | 90% |
-| 5 — Beach Specialized (4,631–4,893 rows/location) | ~0.84 | ~90% |
-| 6 — Desert Pooled (118,753 train rows) | ~1.04 | ~88% |
-| 7 — Desert Specialized (57k–81k rows/region) | ~1.05 | ~88% |
-| 8 — Zero-Shot (no local data) | ~3.0 | ~64% |
+All values at 42 days of training data where applicable. RMSE in °C; lower is better.
 
-Pooled and specialized models outperform single-logger models, but they also
-use much more training data. Scenario 8 shows that even without any local data,
-a model trained on nearby sites still reduces NicheMapR error by ~64%.
+| Scenario | RF RMSE | RF improvement | LSTM RMSE | LSTM improvement |
+|----------|---------|---------------|-----------|-----------------|
+| 1 — Valley (single logger) | 2.69 | 58% | 2.34 | 61% |
+| 2 — Beach (single logger) | 3.06 | 63% | 4.04 | 51% |
+| 3 — Desert (single logger) | 1.88 | 74% | 2.28 | 69% |
+| 4 — Beach Pooled (13,988 train rows) | 0.88 | 90% | 2.09 | 75% |
+| 5 — Beach Specialized (4,631–4,893 rows/location) | ~0.84 | ~90% | ~1.87 | ~77% |
+| 6 — Desert Pooled (118,753 train rows) | ~1.04 | ~88% | ~1.51 | ~83% |
+| 7 — Desert Specialized (57k–81k rows/region) | ~1.05 | ~88% | ~1.40 | ~83% |
+| 8 — Zero-Shot (no local data) | ~3.0 | ~64% | — | — |
+
+RF consistently outperforms LSTM on single-logger scenarios; the gap narrows
+with larger pooled datasets. Pooled and specialized models outperform
+single-logger models, but they also use much more training data.
+Scenario 8 shows that even without any local data, a model trained on nearby
+sites still reduces NicheMapR error by ~64%.
