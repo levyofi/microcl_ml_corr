@@ -71,7 +71,9 @@ get_feature_columns <- function(df,
                                 microhabitat_col = .default_cols$microhabitat,
                                 prediction_col = .default_cols$prediction) {
   cols_to_exclude <- unique(c(avoid_cols, target_col, microhabitat_col, prediction_col))
-  setdiff(names(df), cols_to_exclude)
+  candidates <- setdiff(names(df), cols_to_exclude)
+  # Keep only numeric columns (excludes leftover character metadata columns)
+  candidates[sapply(df[candidates], is.numeric)]
 }
 
 #' Add cyclical time features
