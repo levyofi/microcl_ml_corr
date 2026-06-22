@@ -110,10 +110,16 @@ All values at 42 days of training data where applicable. RMSE in °C; lower is b
 | 5 — Beach Specialized (4,631–4,893 rows/location) | ~0.84 | ~90% | ~1.87 | ~77% |
 | 6 — Desert Pooled (118,753 train rows) | ~1.04 | ~88% | ~1.51 | ~83% |
 | 7 — Desert Specialized (57k–81k rows/region) | ~1.05 | ~88% | ~1.40 | ~83% |
-| 8 — Zero-Shot (no local data) | ~3.0 | ~64% | — | — |
+| 8 — Zero-Shot (no local data) | ~3.0 | ~64% | — | — (RF only; see note) |
 
 RF consistently outperforms LSTM on single-logger scenarios; the gap narrows
 with larger pooled datasets. Pooled and specialized models outperform
 single-logger models, but they also use much more training data.
 Scenario 8 shows that even without any local data, a model trained on nearby
 sites still reduces NicheMapR error by ~64%.
+
+> **Note — Scenario 8 (Zero-Shot):** only Random Forest is tested. The
+> zero-shot experiment focuses on whether *spatial generalisation* works at
+> all, which RF answers cleanly. Adding LSTM would require windowing and
+> scaling across four training strategies × 10 downsampling runs, with
+> results expected to mirror the RF findings.
