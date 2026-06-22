@@ -107,21 +107,6 @@ See the [examples README](inst/examples/README.md) for a summary of results acro
 
 ---
 
-## Key results
-
-| Scenario | RF RMSE (°C) | LSTM RMSE (°C) | Improvement over NicheMapR |
-|----------|-------------|----------------|---------------------------|
-| 1 — Valley (single logger) | 2.69 | 2.34 | 58–61% |
-| 2 — Beach (single logger) | 3.06 | 4.04 | 51–63% |
-| 3 — Desert (single logger) | 1.88 | 2.28 | 69–74% |
-| 4 — Beach Pooled | 0.88 | 2.09 | 75–90% |
-| 6 — Desert Pooled | ~1.04 | ~1.51 | ~83–88% |
-| 8 — Zero-Shot (no local data) | ~3.0 | — | ~64% |
-
-Random Forest tends to outperform LSTM on small single-logger datasets. With larger pooled datasets the gap narrows. Even with no local data at all (Scenario 8), the model reduces NicheMapR error by ~64%.
-
----
-
 ## License
 
 This package is licensed under the MIT License. See the [`LICENSE`](LICENSE) file for details.
