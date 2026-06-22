@@ -120,21 +120,34 @@ lstm_model <- train_lstm(lstm_2h$train_dict$X, lstm_2h$train_dict$y,
 cat("\nRunning learning curve (this may take several minutes)...\n")
 
 lc <- find_min_training_days(
-  splits         = splits,
-  lstm_2h        = lstm_2h,
-  feature_cols   = feature_cols,
-  rf_model       = rf_model,       # full-data reference model
-  lstm_model     = lstm_model,     # full-data reference model
-  lstm_params    = lstm_params,    # architecture to reuse at each partial size
-  rf_test        = rf_test,
-  X_test_lstm    = X_test_lstm,
-  y_test_lstm    = y_test_lstm,
-  base_test_lstm = base_test_lstm,
-  site_col       = SITE_COL,
-  tolerance     = 0.10,            # accept RMSE up to 10% worse than full-data
-  training_days = c(1, 2, 3, 7, 14, 21, 28, 35, 42),  # sizes to test
-  n_runs        = 5,               # repetitions per size (for variance estimate)
-  seed          = SEED
+  # Pre-processed data objects (produced by the pipeline steps above)
+  splits         = splits,         # the train/validation/test data split
+  lstm_2h        = lstm_2h,        # the time series reformatted as 2-hour windows
+  feature_cols   = feature_cols,   # names of the environmental predictor columns
+
+  # Full-data reference models — the "best possible" result with all data.
+  # The function measures how close each partial model gets to these.
+  rf_model       = rf_model,       # Random Forest trained on full training set
+  lstm_model     = lstm_model,     # LSTM trained on full training set
+  lstm_params    = lstm_params,    # best LSTM architecture (units, layers, etc.)
+                                   # reused at every partial training size
+
+  # Test set arrays — used to measure accuracy at every training size
+  rf_test        = rf_test,        # rows to evaluate the RF on
+  X_test_lstm    = X_test_lstm,    # 2-hour input windows for LSTM evaluation
+  y_test_lstm    = y_test_lstm,    # actual residuals at each test time point
+  base_test_lstm = base_test_lstm, # NicheMapR raw predictions at each test point
+
+  site_col       = SITE_COL,       # column that identifies which logger a row belongs to
+
+  # Search settings — adjust these to change the analysis
+  tolerance     = 0.10,            # how much worse than full-data is acceptable
+                                   # 0.10 = within 10% of full-data RMSE
+  training_days = c(1, 2, 3, 7, 14, 21, 28, 35, 42),
+                                   # training sizes to test, in days
+  n_runs        = 5,               # how many times to repeat each size
+                                   # (more runs = smoother curve, but slower)
+  seed          = SEED             # random seed for reproducibility
 )
 
 # ── Step 7: Inspect results ───────────────────────────────────────────────────
