@@ -2,6 +2,44 @@
 # Shared helper functions used by scenario scripts.
 # Source this file at the top of any scenario that loads pre-defined splits.
 
+# setup_tensorflow ---------------------------------------------------------------
+# Finds a Python environment with TensorFlow installed (searches the reticulate
+# uv cache) and sets RETICULATE_PYTHON before reticulate binds to Python.
+# Call this BEFORE library(reticulate) and py_require("tensorflow").
+#
+# Usage (at top of every scenario script, replacing the manual env var):
+#   source(system.file("examples", "utils.R", package = "microclCorr"))
+#   setup_tensorflow()
+#   library(reticulate); py_require("tensorflow")
+setup_tensorflow <- function() {
+  if (nchar(Sys.getenv("RETICULATE_PYTHON")) > 0) return(invisible(NULL))
+
+  cache_root <- file.path(path.expand("~"), "Library", "Caches",
+                           "org.R-project.R", "R", "reticulate", "uv",
+                           "cache", "archive-v0")
+  if (!dir.exists(cache_root)) return(invisible(NULL))
+
+  # Find all python/python3 binaries in the reticulate uv cache
+  all_files  <- list.files(cache_root, recursive = TRUE, full.names = TRUE)
+  candidates <- all_files[grepl("/bin/python3?$", all_files)]
+
+  for (py in candidates) {
+    if (!file.access(py, 1) == 0) next   # not executable
+    has_tf <- tryCatch({
+      res <- suppressWarnings(
+        system2(py, c("-c", "import tensorflow; print('ok')"),
+                stdout = TRUE, stderr = FALSE))
+      any(grepl("ok", res))
+    }, error = function(e) FALSE)
+    if (has_tf) {
+      Sys.setenv(RETICULATE_PYTHON = py)
+      message("setup_tensorflow: using ", py)
+      return(invisible(py))
+    }
+  }
+  invisible(NULL)  # reticulate will find TF via py_require on its own
+}
+
 # load_splits_from_csv -----------------------------------------------------------
 # Scenarios 4-8 use a pre-defined CSV file that assigns every row in the dataset
 # to one of three roles: "train" (used to fit the model), "val" (used to tune
@@ -176,4 +214,267 @@ results_row <- function(model_name, site, metrics) {
     improvement_pct = (metrics$rmse_base - metrics$rmse_corr) / metrics$rmse_base * 100,
     stringsAsFactors = FALSE
   )
+}
+
+# logger_temp_stats --------------------------------------------------------------
+# Summarise measured temperatures for one logger's data subset as daily
+# aggregates: average daily mean, average daily min, average daily max,
+# each reported as mean ± SD across days.
+# Returns a single-row data frame labelled by `label`.
+logger_temp_stats <- function(data_subset, label) {
+  meas <- data_subset$predicted + data_subset$residual
+  date <- as.Date(data_subset$time)
+
+  daily_mean <- tapply(meas, date, mean, na.rm = TRUE)
+  daily_min  <- tapply(meas, date, min,  na.rm = TRUE)
+  daily_max  <- tapply(meas, date, max,  na.rm = TRUE)
+
+  data.frame(
+    logger         = label,
+    daily_mean_avg = round(mean(daily_mean), 2),
+    daily_mean_sd  = round(sd(daily_mean),   2),
+    daily_min_avg  = round(mean(daily_min),  2),
+    daily_min_sd   = round(sd(daily_min),    2),
+    daily_max_avg  = round(mean(daily_max),  2),
+    daily_max_sd   = round(sd(daily_max),    2)
+  )
+}
+
+# make_pred_plot -----------------------------------------------------------------
+# Build a ggplot showing observed, NicheMapR, RF-corrected, and LSTM-corrected
+# temperature lines for a single panel.
+#
+# Arguments:
+#   df           — data frame with columns: time, measured, base, rf, lstm
+#   title_str    — plot title
+#   show_legend  — whether to draw the colour legend (set FALSE for panels 2+
+#                  in a multi-panel grid to avoid repetition)
+#   linewidth_obs — line width for the Observed series
+# make_residual_hist -------------------------------------------------------------
+# Overlay histograms of hourly residuals (measured − predicted) for NicheMapR
+# (before correction), RF, and LSTM (after correction).
+#
+# Arguments:
+#   full_df     — data frame with columns: measured, base, rf, lstm
+#                 (lstm column is optional; omit or set has_lstm = FALSE)
+#   title_str   — plot title
+#   has_lstm    — whether to include the LSTM series (default TRUE)
+#
+# Residuals are defined as measured − model, so positive = model under-predicts.
+make_residual_hist <- function(full_df, title_str, has_lstm = TRUE,
+                               xlim = NULL, show_strip = TRUE, show_legend = TRUE, title_size = 18) {
+  required <- c("measured", "base", "rf")
+  missing  <- setdiff(required, names(full_df))
+  if (length(missing) > 0)
+    stop("make_residual_hist: full_df missing columns: ",
+         paste(missing, collapse = ", "))
+  if (has_lstm && !"lstm" %in% names(full_df))
+    stop("make_residual_hist: has_lstm=TRUE but 'lstm' column not found in full_df")
+
+  check_nas <- c("measured", "base", "rf")
+  if (has_lstm) check_nas <- c(check_nas, "lstm")
+  for (col in check_nas) {
+    n_na <- sum(is.na(full_df[[col]]))
+    if (n_na > 0)
+      warning(sprintf("make_residual_hist: %d NA(s) in column '%s' — dropping",
+                      n_na, col))
+  }
+  full_df <- full_df[complete.cases(full_df[, check_nas]), ]
+
+  res_base <- full_df$measured - full_df$base
+  res_rf   <- full_df$measured - full_df$rf
+
+  rows <- list(
+    data.frame(residual = res_base, model = "NicheMapR"),
+    data.frame(residual = res_rf,   model = "After Random Forest correction")
+  )
+
+  if (has_lstm && "lstm" %in% names(full_df)) {
+    rows[[3]] <- data.frame(residual = full_df$measured - full_df$lstm,
+                            model    = "After LSTM correction")
+  }
+
+  df_long <- do.call(rbind, rows)
+  df_long$model <- factor(df_long$model,
+    levels = c("NicheMapR", "After Random Forest correction", "After LSTM correction"))
+
+  cols <- c("NicheMapR"                       = "#ef4444",
+            "After Random Forest correction"  = "#10b981",
+            "After LSTM correction"            = "#3b82f6")
+
+  if (is.null(xlim)) xlim <- range(df_long$residual, na.rm = TRUE)
+
+  ggplot2::ggplot(df_long, ggplot2::aes(x = residual, fill = model)) +
+    ggplot2::geom_histogram(bins = 50, position = "identity", alpha = 0.5) +
+    ggplot2::geom_vline(xintercept = 0, linetype = "dashed",
+                        linewidth = 0.7, colour = "#333333") +
+    ggplot2::coord_cartesian(xlim = xlim) +
+    ggplot2::scale_fill_manual(values = cols) +
+    ggplot2::labs(
+      title = title_str,
+      x     = expression("Prediction errors (" * degree * "C)"),
+      y     = "Count",
+      fill  = NULL) +
+    ggplot2::theme_minimal(base_size = 18) +
+    ggplot2::theme(
+      plot.title         = ggplot2::element_text(face = "bold", hjust = 0.5, size = title_size),
+      axis.title         = ggplot2::element_text(size = 18),
+      axis.text          = ggplot2::element_text(size = 16),
+      legend.position    = if (show_legend) "top" else "none",
+      legend.text        = ggplot2::element_text(size = 16),
+      legend.margin      = ggplot2::margin(t = 5, r = 0, b = 5, l = 0, unit = "pt"),
+      legend.box.spacing = ggplot2::unit(5, "pt"),
+      plot.margin        = ggplot2::margin(t = 5, r = 5, b = 5, l = 5, unit = "pt"),
+      aspect.ratio       = 1,
+      panel.grid.major   = ggplot2::element_blank(),
+      panel.grid.minor   = ggplot2::element_blank(),
+      panel.border       = ggplot2::element_rect(colour = "black", fill = NA,
+                                                  linewidth = 0.8))
+}
+
+make_pred_plot <- function(df, title_str, show_legend = TRUE, linewidth_obs = 0.9,
+                           has_lstm = TRUE, title_size = 18) {
+  p <- ggplot2::ggplot(df, ggplot2::aes(x = time)) +
+    ggplot2::geom_line(ggplot2::aes(y = measured, color = "Observed"),
+                       linewidth = linewidth_obs) +
+    ggplot2::geom_line(ggplot2::aes(y = base,     color = "NicheMapR"),
+                       linetype = "dashed", linewidth = 0.8)
+  if (has_lstm && "lstm" %in% names(df))
+    p <- p + ggplot2::geom_line(ggplot2::aes(y = lstm, color = "After LSTM correction"),
+                                 linewidth = 0.8)
+  p <- p +
+    ggplot2::geom_line(ggplot2::aes(y = rf,       color = "After Random Forest correction"),
+                       linetype = "dotted", linewidth = 0.8) +
+    ggplot2::scale_color_manual(
+      values = c("Observed"                       = "#111111",
+                 "NicheMapR"                      = "#ef4444",
+                 "After LSTM correction"          = "#3b82f6",
+                 "After Random Forest correction" = "#10b981")) +
+    ggplot2::labs(title = title_str, x = NULL, y = "Temperature (°C)", color = NULL) +
+    ggplot2::theme_minimal(base_size = 16) +
+    ggplot2::theme(
+      plot.title       = ggplot2::element_text(face = "bold", hjust = 0.5, size = title_size),
+      legend.position  = "top",
+      legend.text      = ggplot2::element_text(size = 16),
+      legend.margin      = ggplot2::margin(t = 5, r = 0, b = 5, l = 0, unit = "pt"),
+      axis.title       = ggplot2::element_text(size = 16),
+      axis.text        = ggplot2::element_text(size = 14),
+      panel.grid.major = ggplot2::element_blank(),
+      panel.grid.minor = ggplot2::element_blank(),
+      panel.border     = ggplot2::element_rect(colour = "black", fill = NA, linewidth = 0.8))
+}
+
+# build_pred_df ------------------------------------------------------------------
+# Assemble the four-column prediction data frame from model objects and test data.
+# Returns a data frame sorted by time with columns: time, measured, base, rf, lstm.
+#
+# Arguments:
+#   rf_test        — aligned RF test set (data frame)
+#   feature_cols   — character vector of predictor column names
+#   rf_model       — trained ranger model
+#   base_test_lstm — NicheMapR predictions aligned to LSTM test windows
+#   lstm_model     — trained Keras LSTM model
+#   X_test_lstm    — 3-D array of LSTM test windows
+build_pred_df <- function(rf_test, feature_cols, rf_model,
+                           base_test_lstm, lstm_model, X_test_lstm) {
+  rf_preds   <- rf_test$predicted +
+                ranger:::predict.ranger(rf_model, data = as.data.frame(rf_test[, feature_cols]))$predictions
+  lstm_preds <- base_test_lstm +
+                as.numeric(predict(lstm_model, X_test_lstm, verbose = 0)[, 1])
+  # Preserve the original row order — predictions are positionally aligned to
+  # rf_test rows. Callers should sort per site after filtering; sorting here
+  # across multiple sites would break the positional alignment.
+  data.frame(
+    time     = rf_test$time,
+    measured = rf_test$predicted + rf_test$residual,
+    base     = rf_test$predicted,
+    rf       = rf_preds,
+    lstm     = lstm_preds
+  )
+}
+
+# compute_daily_stats ------------------------------------------------------------
+# From a prediction data frame (columns: time, measured, base, rf, and
+# optionally lstm), compute summary statistics of daily errors.
+#
+# For each model (base, rf, lstm) and each daily aggregate (min, mean, max):
+#   - Compute the per-day absolute error and signed error
+#   - Return avg ± SD of RMSE across days and avg ± SD of ME across days
+#
+# Returns a data frame with one row per model, columns:
+#   model,
+#   rmse_mean_avg, rmse_mean_sd,   (RMSE of daily means across days)
+#   rmse_min_avg,  rmse_min_sd,    (RMSE of daily mins  across days)
+#   rmse_max_avg,  rmse_max_sd,    (RMSE of daily maxes across days)
+#   me_mean_avg,   me_mean_sd,     (ME   of daily means across days)
+#   me_min_avg,    me_min_sd,      (ME   of daily mins  across days)
+#   me_max_avg,    me_max_sd       (ME   of daily maxes across days)
+compute_daily_stats <- function(full_df) {
+  full_df$date <- as.Date(full_df$time)
+  daily <- do.call(rbind, lapply(split(full_df, full_df$date), function(d) {
+    row <- data.frame(
+      date      = d$date[1],
+      meas_min  = min(d$measured),  meas_mean = mean(d$measured), meas_max = max(d$measured),
+      base_min  = min(d$base),      base_mean = mean(d$base),     base_max = max(d$base),
+      rf_min    = min(d$rf),        rf_mean   = mean(d$rf),       rf_max   = max(d$rf)
+    )
+    if ("lstm" %in% names(d)) {
+      row$lstm_min  <- min(d$lstm)
+      row$lstm_mean <- mean(d$lstm)
+      row$lstm_max  <- max(d$lstm)
+    }
+    row
+  }))
+
+  has_lstm <- all(c("lstm_min", "lstm_mean", "lstm_max") %in% names(daily))
+  models   <- if (has_lstm) c("base", "rf", "lstm") else c("base", "rf")
+
+  rows <- lapply(models, function(m) {
+    err_mean <- daily[[paste0(m, "_mean")]] - daily$meas_mean
+    err_min  <- daily[[paste0(m, "_min")]]  - daily$meas_min
+    err_max  <- daily[[paste0(m, "_max")]]  - daily$meas_max
+    data.frame(
+      model         = m,
+      rmse_mean_avg = round(sqrt(mean(err_mean^2)), 2),
+      rmse_mean_sd  = round(sd(abs(err_mean)),       2),
+      rmse_min_avg  = round(sqrt(mean(err_min^2)),   2),
+      rmse_min_sd   = round(sd(abs(err_min)),         2),
+      rmse_max_avg  = round(sqrt(mean(err_max^2)),   2),
+      rmse_max_sd   = round(sd(abs(err_max)),         2),
+      me_mean_avg   = round(mean(err_mean),           2),
+      me_mean_sd    = round(sd(err_mean),             2),
+      me_min_avg    = round(mean(err_min),            2),
+      me_min_sd     = round(sd(err_min),              2),
+      me_max_avg    = round(mean(err_max),            2),
+      me_max_sd     = round(sd(err_max),              2)
+    )
+  })
+  do.call(rbind, rows)
+}
+
+# print_daily_stats --------------------------------------------------------------
+# Pretty-print the output of compute_daily_stats() for one microhabitat/logger.
+# Prints two tables: RMSE and ME, each avg ± SD across days.
+print_daily_stats <- function(ds, label) {
+  cat(sprintf("\n  %s\n", label))
+  cat(sprintf("  %-8s | %20s | %20s | %20s\n",
+              "Model", "Daily Mean RMSE", "Daily Min RMSE", "Daily Max RMSE"))
+  for (i in seq_len(nrow(ds))) {
+    r <- ds[i, ]
+    cat(sprintf("  %-8s | %8.2f ± %-8.2f | %8.2f ± %-8.2f | %8.2f ± %-8.2f\n",
+                r$model,
+                r$rmse_mean_avg, r$rmse_mean_sd,
+                r$rmse_min_avg,  r$rmse_min_sd,
+                r$rmse_max_avg,  r$rmse_max_sd))
+  }
+  cat(sprintf("  %-8s | %20s | %20s | %20s\n",
+              "Model", "Daily Mean ME", "Daily Min ME", "Daily Max ME"))
+  for (i in seq_len(nrow(ds))) {
+    r <- ds[i, ]
+    cat(sprintf("  %-8s | %8.2f ± %-8.2f | %8.2f ± %-8.2f | %8.2f ± %-8.2f\n",
+                r$model,
+                r$me_mean_avg, r$me_mean_sd,
+                r$me_min_avg,  r$me_min_sd,
+                r$me_max_avg,  r$me_max_sd))
+  }
 }
