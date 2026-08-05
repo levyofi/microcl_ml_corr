@@ -29,8 +29,11 @@
 #       the performance difference is not purely due to spatial diversity.
 # =============================================================================
 
-library(microclCorr)
 source(system.file("examples", "utils.R", package = "microclCorr"))
+setup_tensorflow()
+library(reticulate)
+py_require("tensorflow")
+library(microclCorr)
 
 # ── Settings ──────────────────────────────────────────────────────────────────
 SEED        <- 42    # fixing the random seed makes results reproducible
@@ -164,11 +167,15 @@ write.csv(results_df,
           file.path(RESULTS_DIR, "beach_pooled_results.csv"),
           row.names = FALSE)
 
-# Save the RF model so it can be loaded and applied to new data later
+# Save both models so plots and tables can be regenerated without retraining
 save_correction_model(rf_model,
-                       scaler       = NULL,         # RF does not need a scaler
+                       scaler       = NULL,
                        feature_cols = feature_cols,
                        path         = file.path(RESULTS_DIR, "rf_pooled_model.rds"))
+save_correction_model(lstm_model,
+                       scaler       = scaled$scaler,
+                       feature_cols = feature_cols,
+                       path         = file.path(RESULTS_DIR, "lstm_pooled_model.rds"))
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 cat("\nAverage performance across all sites:\n")

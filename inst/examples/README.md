@@ -80,17 +80,19 @@ All input data is bundled with the package and located automatically via
 
 ## Which scenario should I start with?
 
-| Scenario | What it answers |
-|----------|----------------|
-| **preprocessing_examples** | How do I prepare my own logger CSV before using this package? |
-| **1 — Valley** | How well does local correction work? How much data do I need? |
-| **2 — Beach** | Same as Scenario 1, but for a coastal site (harder to correct). |
-| **3 — Desert** | Same as Scenario 1, but for a desert site (very easy to correct). |
-| **4 — Beach Pooled** | Does pooling all loggers into one model improve things? |
-| **5 — Beach Specialized** | Does training one model per location beat the pooled model? |
-| **6 — Desert Pooled** | Same as Scenario 4, but for 48 desert loggers. |
-| **7 — Desert Specialized** | Same as Scenario 5, but per desert region. |
-| **8 — Zero-Shot Transfer** | Can I correct a new site where no logger data exists? |
+The scenarios in this folder correspond directly to the **4 Examples** presented in the main text of the Mazor et al. paper:
+
+| Scenario / Script | Paper Example | What it answers |
+|----------|---------------|----------------|
+| **preprocessing_examples** | — | How do I prepare my own logger CSV before using this package? |
+| **1 — Valley** | **Example 1** | How well does local correction work? How much data do I need? |
+| **2 — Beach** | **Example 1** | Same as Scenario 1, but for a coastal site (harder to correct). |
+| **3 — Desert** | **Example 1** | Same as Scenario 1, but for a desert site (very easy to correct). |
+| **4 — Beach Pooled** | **Example 2** | Does pooling all loggers into one model improve things? |
+| **5 — Beach Specialized** | — | Does training one model per location beat the pooled model? |
+| **6 — Desert Pooled** | — | Same as Scenario 4, but for 48 desert loggers. |
+| **7 — Desert Specialized** | **Example 3** | Same as Scenario 5, but per desert region. |
+| **8 — Zero-Shot Transfer** | **Example 4** | Can I correct a new site where no logger data exists? |
 
 **Recommended reading order:** preprocessing → 1 → 4 → 8.
 Scenarios 2, 3, 5, 6, 7 follow the same pattern as 1 and 4.

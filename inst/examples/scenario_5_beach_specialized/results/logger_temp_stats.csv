@@ -1,0 +1,8 @@
+"logger","daily_mean_avg","daily_mean_sd","daily_min_avg","daily_min_sd","daily_max_avg","daily_max_sd"
+"Ashkelon 10 m",28.74,4,23.04,3.3,36.54,6.1
+"Ashkelon 15 m",33.36,1.23,25.07,1.55,45.98,2.41
+"Range_24 25 m",32.18,2.01,23.63,2.08,45.21,3.35
+"Range_24 45 m",32.07,2.04,23.09,2.45,46.39,3.03
+"Rosh_HaNikra 15 m",32.93,2.32,23.06,3.1,47.58,3.66
+"Rosh_HaNikra 25 m",31.58,1.35,23.22,3.59,43.52,5.51
+"Rosh_HaNikra 45 m",34.46,1.13,25.65,1.82,47.01,3.3

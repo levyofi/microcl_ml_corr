@@ -12,8 +12,11 @@
 # Compare with: Scenario 2 (single logger), Scenario 4 (all sites pooled)
 # =============================================================================
 
-library(microclCorr)
 source(system.file("examples", "utils.R", package = "microclCorr"))
+setup_tensorflow()
+library(reticulate)
+py_require("tensorflow")
+library(microclCorr)
 
 # ── Settings ──────────────────────────────────────────────────────────────────
 SEED        <- 42
@@ -92,9 +95,11 @@ for (loc in c("Ashkelon", "Range_24", "Rosh_HaNikra")) {
     results[[length(results) + 1]] <- c(results_row("LSTM_2h", site, m), list(location = loc))
   }
 
-  # Step 8: Save this location's model so it can be applied to new data later
+  # Step 8: Save both models per location
   save_correction_model(rf_model, scaler = NULL, feature_cols = feature_cols,
                          path = file.path(RESULTS_DIR, paste0("rf_", loc, "_model.rds")))
+  save_correction_model(lstm_model, scaler = scaled$scaler, feature_cols = feature_cols,
+                         path = file.path(RESULTS_DIR, paste0("lstm_", loc, "_model.rds")))
 }
 
 results_df <- do.call(rbind, lapply(results, as.data.frame))

@@ -89,19 +89,19 @@ use_condaenv("your_env_name", required = TRUE)
 
 ## Examples
 
-The package includes eight fully worked examples in [`inst/examples/`](inst/examples/), each answering a different practical question:
+The package includes eight fully worked scenario scripts in [`inst/examples/`](inst/examples/). These correspond directly to the **4 Examples** presented in the Mazor et al. paper, alongside supplementary scenarios:
 
-| Scenario | Question answered |
-|----------|-----------------|
-| [Preprocessing](inst/examples/preprocessing_examples/) | How do I prepare my CSV files before running the pipeline? |
-| [1 — Valley](inst/examples/scenario_1_valley_single_logger/) | How well does local correction work? How much logger data do I need? |
-| [2 — Beach](inst/examples/scenario_2_beach_single_logger/) | Same as above for a coastal site, where NicheMapR errors are larger. |
-| [3 — Desert](inst/examples/scenario_3_desert_single_logger/) | Same as above for a desert site, where even 1–2 days of data is enough. |
-| [4 — Beach Pooled](inst/examples/scenario_4_beach_pooled/) | Does training on ALL loggers at once improve accuracy? |
-| [5 — Beach Specialized](inst/examples/scenario_5_beach_specialized/) | Does training one model per location beat a single pooled model? |
-| [6 — Desert Pooled](inst/examples/scenario_6_desert_pooled/) | Same as Scenario 4, but across 48 desert loggers. |
-| [7 — Desert Specialized](inst/examples/scenario_7_desert_specialized/) | Same as Scenario 5, but per desert region. |
-| [8 — Zero-Shot Transfer](inst/examples/scenario_8_zero_shot_transfer/) | Can the package correct a site where no logger data exists at all? |
+| Scenario / Script | Paper Example | Question answered |
+|----------|---------------|-----------------|
+| [Preprocessing](inst/examples/preprocessing_examples/) | — | How do I prepare my CSV files before running the pipeline? |
+| [1 — Valley](inst/examples/scenario_1_valley_single_logger/) | **Example 1** | How well does local correction work? How much logger data do I need? |
+| [2 — Beach](inst/examples/scenario_2_beach_single_logger/) | **Example 1** | Same as above for a coastal site, where NicheMapR errors are larger. |
+| [3 — Desert](inst/examples/scenario_3_desert_single_logger/) | **Example 1** | Same as above for a desert site, where even 1–2 days of data is enough. |
+| [4 — Beach Pooled](inst/examples/scenario_4_beach_pooled/) | **Example 2** | Does training on ALL loggers at once improve accuracy? |
+| [5 — Beach Specialized](inst/examples/scenario_5_beach_specialized/) | — | Does training one model per location beat a single pooled model? |
+| [6 — Desert Pooled](inst/examples/scenario_6_desert_pooled/) | — | Same as Scenario 4, but across 48 desert loggers. |
+| [7 — Desert Specialized](inst/examples/scenario_7_desert_specialized/) | **Example 3** | Same as Scenario 5, but per desert region. |
+| [8 — Zero-Shot Transfer](inst/examples/scenario_8_zero_shot_transfer/) | **Example 4** | Can the package correct a site where no logger data exists at all? |
 
 Each example is a self-contained R script with plain-English comments throughout. To run an example, open the corresponding `run_scenario_N.R` file in RStudio and click **Source**.
 

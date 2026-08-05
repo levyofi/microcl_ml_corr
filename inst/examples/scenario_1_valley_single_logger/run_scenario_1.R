@@ -25,12 +25,16 @@
 #   See inst/examples/learning_curve_example.R for find_min_training_days().
 # =============================================================================
 
+source(system.file("examples", "utils.R", package = "microclCorr"))
+setup_tensorflow()
+library(reticulate)
+py_require("tensorflow")
 library(microclCorr)
 library(ggplot2)
 library(gridExtra)
 
 # ── Settings ──────────────────────────────────────────────────────────────────
-SEED <- 123
+SEED <- 42   # test block = May 14–20 (previously 123 = Apr 2–8, which showed over-correction)
 
 DATA_PATH    <- system.file("extdata", "Harod_dataset.csv", package = "microclCorr")
 SCENARIO_DIR <- file.path("inst", "examples", "scenario_1_valley_single_logger")
@@ -46,8 +50,11 @@ tasks <- list(
 
 cat("=== Scenario 1: Valley Habitat ===\n")
 
-all_results <- list()
-plot_list   <- list()
+all_results      <- list()
+plot_list        <- list()
+temp_plot_list   <- list()
+stats_list       <- list()
+daily_stats_list <- list()
 
 for (task in tasks) {
   cat(sprintf("\n── Microhabitat: %s ──\n", task$name))
@@ -149,39 +156,53 @@ for (task in tasks) {
                          path = file.path(RESULTS_DIR,
                                           paste0(task$name, "_lstm_model.rds")))
 
-  # ── Prediction plot ──────────────────────────────────────────────────────────
-  rf_preds   <- rf_test$predicted +
-                predict(rf_model, data = rf_test[, feature_cols])$predictions
-  lstm_preds <- base_test_lstm +
-                predict(lstm_model, X_test_lstm, verbose = 0)[, 1]
+  # ── Temperature statistics for this logger ───────────────────────────────────
+  stats_list[[task$name]] <- logger_temp_stats(data, task$title)
 
-  plot_df <- head(data.frame(
-    time     = rf_test$time,
-    measured = rf_test$predicted + rf_test$residual,
-    base     = rf_test$predicted,
-    rf       = rf_preds,
-    lstm     = lstm_preds
-  )[order(rf_test$time), ], 120)
+  # ── Build prediction data frame ───────────────────────────────────────────────
+  full_df <- build_pred_df(rf_test, feature_cols, rf_model,
+                            base_test_lstm, lstm_model, X_test_lstm)
+  full_df <- full_df[order(full_df$time), ]
 
-  plot_list[[task$name]] <- ggplot(plot_df, aes(x = time)) +
-    geom_line(aes(y = measured, color = "Observed"),       linewidth = 1.0) +
-    geom_line(aes(y = base,     color = "NicheMapR"),      linetype = "dashed",  linewidth = 0.8) +
-    geom_line(aes(y = lstm,     color = "LSTM Corrected"), linewidth = 0.9) +
-    geom_line(aes(y = rf,       color = "RF Corrected"),   linetype = "dotted",  linewidth = 0.9) +
-    scale_color_manual(values = c("Observed" = "#111111", "NicheMapR" = "#ef4444",
-                                   "LSTM Corrected" = "#3b82f6", "RF Corrected" = "#10b981")) +
-    labs(title = task$title, x = NULL, y = "Temperature (°C)", color = NULL) +
-    theme_minimal(base_size = 10) +
-    theme(plot.title      = element_text(face = "bold", hjust = 0.5),
-          legend.position = if (task$name == tasks[[1]]$name) "top" else "none",
-          panel.grid.minor = element_blank())
+  # ── Daily min / mean / max RMSE, ME, and SD ──────────────────────────────────
+  daily_stats_list[[task$name]] <- compute_daily_stats(full_df)
+
+  # ── Prediction plots ──────────────────────────────────────────────────────────
+  is_first <- task$name == tasks[[1]]$name
+
+  # 120-hour excerpt for the compact multi-panel overview plot
+  plot_list[[task$name]] <- make_pred_plot(
+    head(full_df, 120), task$title, show_legend = is_first)
+
+  # Full test-set temporal plot for this logger
+  temp_plot_list[[task$name]] <- make_pred_plot(
+    full_df, task$title, show_legend = is_first)
 }
 
-# ── Save prediction plot and summary ──────────────────────────────────────────
+# ── Save prediction plot (120-hour excerpt) ───────────────────────────────────
 ggsave(file.path(SCENARIO_DIR, "prediction_examples_valley.png"),
        grid.arrange(grobs = plot_list, ncol = 3), width = 15, height = 5, dpi = 300)
 
+# ── Save full test-set temporal plots ─────────────────────────────────────────
+ggsave(file.path(SCENARIO_DIR, "temporal_predictions_valley.png"),
+       grid.arrange(grobs = temp_plot_list, ncol = 1),
+       width = 12, height = 10, dpi = 300)
+
+# ── Save temperature statistics table ─────────────────────────────────────────
+stats_df <- do.call(rbind, stats_list)
+write.csv(stats_df, file.path(RESULTS_DIR, "logger_temp_stats.csv"), row.names = FALSE)
+cat("\nLogger temperature statistics (full dataset):\n")
+print(stats_df)
+
+# ── Performance summary ────────────────────────────────────────────────────────
 all_df <- do.call(rbind, all_results)
 cat("\nPerformance summary:\n")
 print(aggregate(cbind(rmse_base, rmse_corr, improvement_pct) ~ model, all_df, mean))
+
+# ── Daily min / mean / max statistics ─────────────────────────────────────────
+cat("\nDaily min / mean / max — RMSE, ME, SD (°C):\n")
+for (task in tasks) {
+  print_daily_stats(daily_stats_list[[task$name]], task$title)
+}
+
 cat("=== Scenario 1 complete ===\n")

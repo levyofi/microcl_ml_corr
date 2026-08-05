@@ -31,9 +31,13 @@
 # Compare with: Scenario 6 (pooled, all 48 desert loggers combined)
 # =============================================================================
 
+source(system.file("examples", "utils.R", package = "microclCorr"))
+setup_tensorflow()
+library(reticulate)
+py_require("tensorflow")
 library(microclCorr)
 library(ggplot2)
-library(gridExtra)   # for arranging multiple plots side by side
+library(gridExtra)
 
 # ── Settings ──────────────────────────────────────────────────────────────────
 SEED     <- 123            # fixing the random seed makes results reproducible
@@ -53,15 +57,16 @@ tasks <- list(
 
 cat("=== Scenario 3: Desert Habitat ===\n")
 
-all_results <- list()
-plot_list   <- list()
+all_results      <- list()
+plot_list        <- list()
+temp_plot_list   <- list()
+stats_list       <- list()
+daily_stats_list <- list()
 
 for (task in tasks) {
   cat(sprintf("\n── Microhabitat: %s ──\n", task$name))
 
   # ── Step 1: Load data ───────────────────────────────────────────────────────
-  # Read the pre-aligned CSV, parse the datetime column, and create one binary
-  # (0/1) column per habitat category. Keep only the current logger's rows.
   data <- load_prepared_csv_data(DATA_PATH,
                                   datetime_format = "%Y-%m-%d %H:%M:%S",
                                   includes_index  = TRUE)
@@ -83,37 +88,21 @@ for (task in tasks) {
               nrow(splits$train), nrow(splits$val), nrow(splits$test)))
 
   # ── Step 3: Select predictor columns ────────────────────────────────────────
-  # Identify which columns to use as model inputs — environmental variables
-  # (radiation, humidity, wind speed), cyclical time features (hour, month),
-  # and habitat indicators. Identifiers, timestamps, and the target column
-  # (residual) are automatically excluded.
   feature_cols <- get_feature_columns(splits$train)
 
   # ── Step 4 (LSTM): Normalise and create 2-hour windows ──────────────────────
-  # Scale all values to the 0–1 range using training data statistics only
-  # (no information from the test set leaks into the model this way).
   scaled <- lstm_scaling(splits$train, splits$val, splits$test)
-
-  # Reshape the time series into overlapping 2-hour windows. Each window
-  # contains 2 consecutive hours; the model predicts the residual at the
-  # last hour of the window. All LSTM results in this script use 2h windows.
   lstm_2h <- lstm_specific_preprocessing(scaled$train, scaled$val, scaled$test,
                                           window_size = 2, ts_names_col = SITE_COL)
 
   # ── Step 5: Align test sets ─────────────────────────────────────────────────
-  # The LSTM only produces a prediction at the END of each 2-hour window,
-  # not for every row. Trim the RF test set to those same time points so
-  # both models are evaluated on exactly the same rows — a fair comparison.
   rf_test        <- align_test_sets(splits$test, lstm_2h$test_dict,
                                     lstm_2h$index_info, SITE_COL)
-  X_test_lstm    <- lstm_2h$test_dict$X          # 2-hour input windows (test)
-  y_test_lstm    <- lstm_2h$test_dict$y          # actual residuals (test)
-  base_test_lstm <- lstm_2h$test_dict$base_pred  # NicheMapR raw predictions (test)
+  X_test_lstm    <- lstm_2h$test_dict$X
+  y_test_lstm    <- lstm_2h$test_dict$y
+  base_test_lstm <- lstm_2h$test_dict$base_pred
 
   # ── Step 6: Tune and train Random Forest ────────────────────────────────────
-  # A Random Forest builds many decision trees and combines their predictions.
-  # "Tuning" searches over 5 combinations of hyperparameters and picks the
-  # best one using the validation set.
   cat("  Tuning and training RF...\n")
   rf_model <- train_rf(splits$train[, feature_cols], splits$train$residual,
                         tune = TRUE, n_combinations = 5,
@@ -122,35 +111,27 @@ for (task in tasks) {
                         seed  = SEED)
 
   # ── Step 7: Tune and train LSTM ─────────────────────────────────────────────
-  # First, find the best network architecture by testing 5 random configurations:
-  # how many memory units, layers, how much dropout, and what learning rate.
-  # The best configuration is chosen based on validation error.
   cat("  Tuning LSTM hyperparameters...\n")
   hpo <- lstm_hypertuning(lstm_2h$train_dict$X, lstm_2h$train_dict$y,
                            lstm_2h$val_dict$X,   lstm_2h$val_dict$y,
-                           n_trials   = 5,    # number of architectures to try
-                           epochs     = 40,   # maximum training passes per trial
-                           batch_size = 32,   # rows processed per weight update
-                           patience   = 10,   # stop early if no improvement for 10 epochs
+                           n_trials   = 5,
+                           epochs     = 40,
+                           batch_size = 32,
+                           patience   = 10,
                            seed       = SEED)
-  lstm_params <- hpo$params   # best architecture found
+  lstm_params <- hpo$params
 
-  # Now train the LSTM with the best architecture on the full training set.
   cat("  Training LSTM with best architecture...\n")
   lstm_model <- train_lstm(lstm_2h$train_dict$X, lstm_2h$train_dict$y,
                             lstm_2h$val_dict$X,   lstm_2h$val_dict$y,
-                            n_units    = lstm_params$n_units,   # memory cells
-                            n_layers   = lstm_params$n_layers,  # stacked layers
-                            dropout    = lstm_params$dropout,   # regularisation
-                            lr         = lstm_params$lr,        # learning rate
+                            n_units    = lstm_params$n_units,
+                            n_layers   = lstm_params$n_layers,
+                            dropout    = lstm_params$dropout,
+                            lr         = lstm_params$lr,
                             epochs = 40, batch_size = 32, patience = 10,
                             seed   = SEED)
 
   # ── Step 8: Evaluate both models ────────────────────────────────────────────
-  # Measure how well each model corrected NicheMapR on the held-out test rows.
-  #   rmse_base — RMSE of the raw NicheMapR prediction (before correction)
-  #   rmse_corr — RMSE after applying the correction model (lower = better)
-  #   improvement_pct — percentage reduction in error
   m_rf   <- evaluate_correction(rf_model, rf_test[, feature_cols],
                                   rf_test$residual, rf_test$predicted,
                                   model_type = "rf")
@@ -170,8 +151,6 @@ for (task in tasks) {
             row.names = FALSE)
 
   # ── Step 9: Save models ──────────────────────────────────────────────────────
-  # Saving the model bundles everything needed to correct new NicheMapR output:
-  # the trained model, the scaling parameters, and the list of input columns.
   save_correction_model(rf_model, scaler = NULL, feature_cols = feature_cols,
                          path = file.path(RESULTS_DIR,
                                           paste0(task$name, "_rf_model.rds")))
@@ -180,43 +159,51 @@ for (task in tasks) {
                          path = file.path(RESULTS_DIR,
                                           paste0(task$name, "_lstm_model.rds")))
 
-  # ── Prediction plot ──────────────────────────────────────────────────────────
-  # Plot the first 120 hours (5 days) of the test set showing:
-  #   Observed       — actual temperature from the logger
-  #   NicheMapR      — original prediction before correction
-  #   RF Corrected   — NicheMapR + RF-predicted residual
-  #   LSTM Corrected — NicheMapR + LSTM-predicted residual
-  rf_preds   <- rf_test$predicted +
-                predict(rf_model, data = rf_test[, feature_cols])$predictions
-  lstm_preds <- base_test_lstm +
-                predict(lstm_model, X_test_lstm, verbose = 0)[, 1]
+  # ── Temperature statistics for this logger ───────────────────────────────────
+  stats_list[[task$name]] <- logger_temp_stats(data, task$title)
 
-  plot_df <- head(data.frame(
-    time     = rf_test$time,
-    measured = rf_test$predicted + rf_test$residual,
-    base     = rf_test$predicted,
-    rf       = rf_preds, lstm = lstm_preds
-  )[order(rf_test$time), ], 120)
+  # ── Build prediction data frame ───────────────────────────────────────────────
+  full_df <- build_pred_df(rf_test, feature_cols, rf_model,
+                            base_test_lstm, lstm_model, X_test_lstm)
+  full_df <- full_df[order(full_df$time), ]
 
-  plot_list[[task$name]] <- ggplot(plot_df, aes(x = time)) +
-    geom_line(aes(y = measured, color = "Observed"),       linewidth = 1.0) +
-    geom_line(aes(y = base,     color = "NicheMapR"),      linetype = "dashed",  linewidth = 0.8) +
-    geom_line(aes(y = lstm,     color = "LSTM Corrected"), linewidth = 0.9) +
-    geom_line(aes(y = rf,       color = "RF Corrected"),   linetype = "dotted",  linewidth = 0.9) +
-    scale_color_manual(values = c("Observed" = "#111111", "NicheMapR" = "#ef4444",
-                                   "LSTM Corrected" = "#3b82f6", "RF Corrected" = "#10b981")) +
-    labs(title = task$title, x = NULL, y = "Temperature (°C)", color = NULL) +
-    theme_minimal(base_size = 10) +
-    theme(plot.title      = element_text(face = "bold", hjust = 0.5),
-          legend.position = if (task$name == tasks[[1]]$name) "top" else "none",
-          panel.grid.minor = element_blank())
+  # ── Daily min / mean / max RMSE, ME, and SD ──────────────────────────────────
+  daily_stats_list[[task$name]] <- compute_daily_stats(full_df)
+
+  # ── Prediction plots ──────────────────────────────────────────────────────────
+  is_first <- task$name == tasks[[1]]$name
+
+  plot_list[[task$name]] <- make_pred_plot(
+    head(full_df, 120), task$title, show_legend = is_first)
+
+  temp_plot_list[[task$name]] <- make_pred_plot(
+    full_df, task$title, show_legend = is_first)
 }
 
-# ── Save prediction plots and summary ─────────────────────────────────────────
+# ── Save prediction plot (120-hour excerpt) ───────────────────────────────────
 ggsave(file.path(SCENARIO_DIR, "prediction_examples_desert.png"),
        grid.arrange(grobs = plot_list, ncol = 2), width = 12, height = 5, dpi = 300)
 
+# ── Save full test-set temporal plots ─────────────────────────────────────────
+ggsave(file.path(SCENARIO_DIR, "temporal_predictions_desert.png"),
+       grid.arrange(grobs = temp_plot_list, ncol = 1),
+       width = 12, height = 9, dpi = 300)
+
+# ── Save temperature statistics table ─────────────────────────────────────────
+stats_df <- do.call(rbind, stats_list)
+write.csv(stats_df, file.path(RESULTS_DIR, "logger_temp_stats.csv"), row.names = FALSE)
+cat("\nLogger temperature statistics (full dataset):\n")
+print(stats_df)
+
+# ── Performance summary ────────────────────────────────────────────────────────
 all_df <- do.call(rbind, all_results)
 cat("\nPerformance summary:\n")
 print(aggregate(cbind(rmse_base, rmse_corr, improvement_pct) ~ model, all_df, mean))
+
+# ── Daily min / mean / max statistics ─────────────────────────────────────────
+cat("\nDaily min / mean / max — RMSE, ME, SD (°C):\n")
+for (task in tasks) {
+  print_daily_stats(daily_stats_list[[task$name]], task$title)
+}
+
 cat("=== Scenario 3 complete ===\n")

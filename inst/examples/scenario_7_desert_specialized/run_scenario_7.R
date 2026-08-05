@@ -7,8 +7,11 @@
 # Compare with: Scenario 3 (single logger), Scenario 6 (all sites pooled)
 # =============================================================================
 
-library(microclCorr)
 source(system.file("examples", "utils.R", package = "microclCorr"))
+setup_tensorflow()
+library(reticulate)
+py_require("tensorflow")
+library(microclCorr)
 
 # ── Settings ──────────────────────────────────────────────────────────────────
 SEED        <- 42
@@ -40,9 +43,9 @@ for (region in c("Mishmar", "Tzeelim")) {
   cat(sprintf("\n── Region: %s ──\n", region))
 
   # Subset to this region only
-  train_reg <- splits$train[splits$train$location == region, ]
-  val_reg   <- splits$val  [splits$val$location   == region, ]
-  test_reg  <- splits$test [splits$test$location  == region, ]
+  train_reg <- splits$train[splits$train$Location == region, ]
+  val_reg   <- splits$val  [splits$val$Location   == region, ]
+  test_reg  <- splits$test [splits$test$Location  == region, ]
   cat(sprintf("Train: %d | Validation: %d | Test: %d rows\n",
               nrow(train_reg), nrow(val_reg), nrow(test_reg)))
 
@@ -82,9 +85,11 @@ for (region in c("Mishmar", "Tzeelim")) {
     results[[length(results) + 1]] <- c(results_row("LSTM_2h", site, m), list(region = region))
   }
 
-  # Step 8: Save this region's model
+  # Step 8: Save both models per region
   save_correction_model(rf_model, scaler = NULL, feature_cols = feature_cols,
                          path = file.path(RESULTS_DIR, paste0("rf_", region, "_model.rds")))
+  save_correction_model(lstm_model, scaler = scaled$scaler, feature_cols = feature_cols,
+                         path = file.path(RESULTS_DIR, paste0("lstm_", region, "_model.rds")))
 }
 
 results_df <- do.call(rbind, lapply(results, as.data.frame))

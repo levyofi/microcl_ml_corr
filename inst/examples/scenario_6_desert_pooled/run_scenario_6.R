@@ -11,8 +11,11 @@
 #       the performance difference is not purely due to spatial diversity.
 # =============================================================================
 
-library(microclCorr)
 source(system.file("examples", "utils.R", package = "microclCorr"))
+setup_tensorflow()
+library(reticulate)
+py_require("tensorflow")
+library(microclCorr)
 
 # ── Settings ──────────────────────────────────────────────────────────────────
 SEED        <- 42
@@ -103,6 +106,8 @@ write.csv(results_df,
           row.names = FALSE)
 save_correction_model(rf_model, scaler = NULL, feature_cols = feature_cols,
                        path = file.path(RESULTS_DIR, "rf_pooled_model.rds"))
+save_correction_model(lstm_model, scaler = scaled$scaler, feature_cols = feature_cols,
+                       path = file.path(RESULTS_DIR, "lstm_pooled_model.rds"))
 
 cat("\nAverage performance by region and microhabitat:\n")
 print(aggregate(cbind(rmse_base, rmse_corr, improvement_pct) ~ model + region + microhabitat,

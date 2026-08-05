@@ -29,9 +29,10 @@
 #       is already ~3× more data than the single logger in Scenario 2.
 # =============================================================================
 
+source(system.file("examples", "utils.R", package = "microclCorr"))
 library(microclCorr)
 library(ggplot2)
-source(system.file("examples", "utils.R", package = "microclCorr"))
+library(gridExtra)
 
 # ── Settings ──────────────────────────────────────────────────────────────────
 SEED         <- 42
@@ -59,8 +60,21 @@ splits <- load_splits_from_csv(data, SPLITS_PATH, SITE_COL)
 # ── Step 3: Select predictor columns ──────────────────────────────────────────
 feature_cols <- get_feature_columns(splits$train)
 
+# ── Temperature statistics (full dataset, per location) ───────────────────────
+stats_list <- list()
+for (loc in c("Ashkelon", "Range_24", "Rosh_HaNikra")) {
+  loc_data <- data[data$location == loc, ]
+  stats_list[[loc]] <- logger_temp_stats(loc_data, loc)
+}
+stats_df <- do.call(rbind, stats_list)
+write.csv(stats_df, file.path(RESULTS_DIR, "logger_temp_stats.csv"), row.names = FALSE)
+cat("\nLogger temperature statistics:\n"); print(stats_df)
+
 # ── Steps 4–7: Loop — treat each location as the unseen target in turn ────────
-results <- list()
+results      <- list()
+plot_panels  <- list()
+excerpt_panels <- list()
+hist_panels  <- list()
 
 for (target in c("Ashkelon", "Range_24", "Rosh_HaNikra")) {
   cat(sprintf("\n── Target location (held out): %s ──\n", target))
@@ -80,6 +94,38 @@ for (target in c("Ashkelon", "Range_24", "Rosh_HaNikra")) {
   results[[length(results) + 1]] <- data.frame(
     target = target, strategy = "A: Zero-Shot (Nearby Sites)",
     train_size = nrow(train_other), rmse_base = rmse_raw, rmse_corr = m_zs$rmse_corr)
+
+  # Save zero-shot model so plots can be regenerated without retraining
+  save_correction_model(rf_zs, scaler = NULL, feature_cols = feature_cols,
+                         path = file.path(RESULTS_DIR,
+                                          paste0("rf_zeroshot_", target, "_model.rds")))
+
+  # Build prediction data frame for strategy A (zero-shot) — RF only
+  zs_preds <- test_loc$predicted +
+              predict(rf_zs, data = test_loc[, feature_cols])$predictions
+  full_df_zs <- data.frame(
+    time     = test_loc$time,
+    measured = test_loc$predicted + test_loc$residual,
+    base     = test_loc$predicted,
+    rf       = zs_preds
+  )[order(test_loc$time), ]
+
+  is_first <- target == "Ashkelon"
+  plot_panels[[target]]    <- make_pred_plot(full_df_zs,
+    sprintf("Zero-Shot: %s (held out)", target),
+    show_legend = is_first, has_lstm = FALSE)
+  excerpt_panels[[target]] <- make_pred_plot(head(full_df_zs, 120),
+    sprintf("Zero-Shot: %s (held out)", target),
+    show_legend = is_first, has_lstm = FALSE)
+
+  # Residual histogram: before (NicheMapR) and after (zero-shot RF)
+  xlim_zs <- range(c(full_df_zs$measured - full_df_zs$base,
+                      full_df_zs$measured - full_df_zs$rf), na.rm = TRUE)
+  hist_panels[[target]] <- make_residual_hist(full_df_zs,
+    sprintf("Zero-Shot: %s", target),
+    has_lstm   = FALSE,
+    xlim       = xlim_zs,
+    show_strip = (target == "Rosh_HaNikra"))
 
   # ── Strategy B: Specialized — train on local data only (best case for local) ──
   train_local <- splits$train[splits$train$location == target, ]
@@ -122,10 +168,22 @@ results_df <- do.call(rbind, results)
 results_df$improvement_pct <- (results_df$rmse_base - results_df$rmse_corr) /
                                results_df$rmse_base * 100
 
-# ── Step 8: Save results ──────────────────────────────────────────────────────
+# ── Step 8: Save results and plots ────────────────────────────────────────────
 write.csv(results_df,
           file.path(RESULTS_DIR, "zero_shot_results.csv"),
           row.names = FALSE)
+
+ggsave(file.path(SCENARIO_DIR, "temporal_predictions_zero_shot.png"),
+       grid.arrange(grobs = plot_panels, ncol = 1),
+       width = 12, height = 10, dpi = 300)
+
+ggsave(file.path(SCENARIO_DIR, "prediction_examples_zero_shot.png"),
+       grid.arrange(grobs = excerpt_panels, ncol = 3),
+       width = 15, height = 5, dpi = 300)
+
+ggsave(file.path(SCENARIO_DIR, "residual_histogram_zero_shot.png"),
+       grid.arrange(grobs = hist_panels, ncol = 3),
+       width = 15, height = 8, dpi = 300)
 
 # ── Plot: compare strategies side by side per location ────────────────────────
 results_df$strategy <- factor(results_df$strategy,

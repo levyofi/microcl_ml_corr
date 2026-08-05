@@ -262,7 +262,7 @@ logger_temp_stats <- function(data_subset, label) {
 #
 # Residuals are defined as measured − model, so positive = model under-predicts.
 make_residual_hist <- function(full_df, title_str, has_lstm = TRUE,
-                               xlim = NULL, show_strip = TRUE, show_legend = TRUE, title_size = 18) {
+                               xlim = NULL, show_strip = TRUE, show_legend = TRUE) {
   required <- c("measured", "base", "rf")
   missing  <- setdiff(required, names(full_df))
   if (length(missing) > 0)
@@ -285,27 +285,27 @@ make_residual_hist <- function(full_df, title_str, has_lstm = TRUE,
   res_rf   <- full_df$measured - full_df$rf
 
   rows <- list(
-    data.frame(residual = res_base, model = "NicheMapR"),
-    data.frame(residual = res_rf,   model = "After Random Forest correction")
+    data.frame(residual = res_base, model = "NicheMapR (before)"),
+    data.frame(residual = res_rf,   model = "RF (after)")
   )
 
   if (has_lstm && "lstm" %in% names(full_df)) {
     rows[[3]] <- data.frame(residual = full_df$measured - full_df$lstm,
-                            model    = "After LSTM correction")
+                            model    = "LSTM (after)")
   }
 
   df_long <- do.call(rbind, rows)
   df_long$model <- factor(df_long$model,
-    levels = c("NicheMapR", "After Random Forest correction", "After LSTM correction"))
+    levels = c("NicheMapR (before)", "RF (after)", "LSTM (after)"))
 
-  cols <- c("NicheMapR"                       = "#ef4444",
-            "After Random Forest correction"  = "#10b981",
-            "After LSTM correction"            = "#3b82f6")
+  cols <- c("NicheMapR (before)" = "#ef4444",
+            "RF (after)"         = "#10b981",
+            "LSTM (after)"       = "#3b82f6")
 
   if (is.null(xlim)) xlim <- range(df_long$residual, na.rm = TRUE)
 
-  ggplot2::ggplot(df_long, ggplot2::aes(x = residual, fill = model)) +
-    ggplot2::geom_histogram(bins = 50, position = "identity", alpha = 0.5) +
+  p <- ggplot2::ggplot(df_long, ggplot2::aes(x = residual, fill = model)) +
+    ggplot2::geom_histogram(bins = 50, position = "identity", colour = "white", alpha = 0.5) +
     ggplot2::geom_vline(xintercept = 0, linetype = "dashed",
                         linewidth = 0.7, colour = "#333333") +
     ggplot2::coord_cartesian(xlim = xlim) +
@@ -317,51 +317,51 @@ make_residual_hist <- function(full_df, title_str, has_lstm = TRUE,
       fill  = NULL) +
     ggplot2::theme_minimal(base_size = 18) +
     ggplot2::theme(
-      plot.title         = ggplot2::element_text(face = "bold", hjust = 0.5, size = title_size),
+      aspect.ratio       = 1,
+      plot.title         = ggplot2::element_text(face = "bold", hjust = 0.5, size = 20),
       axis.title         = ggplot2::element_text(size = 18),
       axis.text          = ggplot2::element_text(size = 16),
-      legend.position    = if (show_legend) "top" else "none",
+      legend.position    = "bottom",
       legend.text        = ggplot2::element_text(size = 16),
-      legend.margin      = ggplot2::margin(t = 5, r = 0, b = 5, l = 0, unit = "pt"),
-      legend.box.spacing = ggplot2::unit(5, "pt"),
-      plot.margin        = ggplot2::margin(t = 5, r = 5, b = 5, l = 5, unit = "pt"),
-      aspect.ratio       = 1,
       panel.grid.major   = ggplot2::element_blank(),
       panel.grid.minor   = ggplot2::element_blank(),
       panel.border       = ggplot2::element_rect(colour = "black", fill = NA,
                                                   linewidth = 0.8))
+  
+  if (!show_legend) {
+    p <- p + ggplot2::theme(legend.position = "none")
+  }
+  
+  return(p)
 }
 
 make_pred_plot <- function(df, title_str, show_legend = TRUE, linewidth_obs = 0.9,
-                           has_lstm = TRUE, title_size = 18) {
+                           has_lstm = TRUE) {
   p <- ggplot2::ggplot(df, ggplot2::aes(x = time)) +
     ggplot2::geom_line(ggplot2::aes(y = measured, color = "Observed"),
                        linewidth = linewidth_obs) +
     ggplot2::geom_line(ggplot2::aes(y = base,     color = "NicheMapR"),
                        linetype = "dashed", linewidth = 0.8)
   if (has_lstm && "lstm" %in% names(df))
-    p <- p + ggplot2::geom_line(ggplot2::aes(y = lstm, color = "After LSTM correction"),
+    p <- p + ggplot2::geom_line(ggplot2::aes(y = lstm, color = "LSTM Corrected"),
                                  linewidth = 0.8)
   p <- p +
-    ggplot2::geom_line(ggplot2::aes(y = rf,       color = "After Random Forest correction"),
+    ggplot2::geom_line(ggplot2::aes(y = rf,       color = "RF Corrected"),
                        linetype = "dotted", linewidth = 0.8) +
     ggplot2::scale_color_manual(
-      values = c("Observed"                       = "#111111",
-                 "NicheMapR"                      = "#ef4444",
-                 "After LSTM correction"          = "#3b82f6",
-                 "After Random Forest correction" = "#10b981")) +
+      values = c("Observed"       = "#111111",
+                 "NicheMapR"      = "#ef4444",
+                 "LSTM Corrected" = "#3b82f6",
+                 "RF Corrected"   = "#10b981")) +
     ggplot2::labs(title = title_str, x = NULL, y = "Temperature (°C)", color = NULL) +
     ggplot2::theme_minimal(base_size = 16) +
     ggplot2::theme(
-      plot.title       = ggplot2::element_text(face = "bold", hjust = 0.5, size = title_size),
+      plot.title       = ggplot2::element_text(face = "bold", hjust = 0.5, size = 18),
       legend.position  = "top",
       legend.text      = ggplot2::element_text(size = 16),
-      legend.margin      = ggplot2::margin(t = 5, r = 0, b = 5, l = 0, unit = "pt"),
       axis.title       = ggplot2::element_text(size = 16),
       axis.text        = ggplot2::element_text(size = 14),
-      panel.grid.major = ggplot2::element_blank(),
-      panel.grid.minor = ggplot2::element_blank(),
-      panel.border     = ggplot2::element_rect(colour = "black", fill = NA, linewidth = 0.8))
+      panel.grid.minor = ggplot2::element_blank())
 }
 
 # build_pred_df ------------------------------------------------------------------
