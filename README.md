@@ -34,11 +34,55 @@ Two model types are available and compared:
 
 ## Workflow
 
-The diagram below shows the full pipeline from raw CSV files to corrected predictions.
+Once the aligned CSV is prepared, the ML pipeline proceeds through the following stages:
 
-![microclCorr workflow](vignettes/workflow_combined.png)
+```mermaid
+flowchart TD
+    %% Data Preparation
+    subgraph Prep [Data preparation]
+        L[load_prepared_csv_data] --> C[add_cyclical_time]
+        C --> F[get_feature_columns]
+        F --> S[split_train_val_test]
+    end
 
-An interactive version is available at [`vignettes/workflow_diagram.html`](vignettes/workflow_diagram.html).
+    %% Random Forest Training
+    subgraph RF [Random Forest Training]
+        RF_T[train_rf]
+    end
+
+    %% LSTM Training
+    subgraph LSTM [LSTM Training]
+        SCL[lstm_scaling] --> WIN[lstm_specific_preprocessing]
+        WIN --> LTT[train_lstm]
+    end
+
+    S --> RF_T
+    S --> SCL
+
+    %% Model Selection
+    subgraph Sel [Model selection]
+        RF_T --> ALGN[align_test_sets]
+        LTT --> ALGN
+        ALGN --> EVAL[evaluate_correction]
+        EVAL --> CMP[Compare models]
+        CMP --> SAV[save_correction_model]
+    end
+
+    %% Apply to New Data
+    subgraph Inf [Apply to New Data]
+        LDM[load_correction_model] --> PRD[correct_predictions]
+    end
+    
+    SAV -.-> LDM
+```
+
+**Pipeline Stages:**
+1. **Data preparation**: Load the aligned CSV, encode cyclical time features, identify predictor columns, and partition the data into training, validation, and test subsets.
+2. **Training**: The data is passed to two parallel training branches:
+   - **Random Forest**: Fits a Random Forest model.
+   - **LSTM**: Normalizes inputs, reformats time series into overlapping windows, and fits the neural network.
+3. **Model selection**: Test sets are aligned and evaluated. The model with the best correction accuracy is selected and saved.
+4. **Apply to New Data**: The saved model bundle is loaded and applied to correct new physical model predictions.
 
 **What you need to provide:**
 - A **logger data CSV** — measured temperatures, timestamps, microhabitat label, and environmental variables
