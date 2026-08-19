@@ -86,7 +86,7 @@ flowchart TD
 
 **What you need to provide:**
 - A **logger data CSV** — measured temperatures, timestamps, microhabitat label, and environmental variables
-- A **NicheMapR predictions CSV** — model-predicted temperatures for the same location and time period
+- A **physical model predictions CSV** — model-predicted temperatures for the same location and time period
 
 **Your only pre-processing step** (done outside the package):
 1. Join both files by timestamp and add a `residual` column (measured − predicted)
