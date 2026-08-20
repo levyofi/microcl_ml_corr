@@ -80,7 +80,7 @@ for (loc in locs_s5) {
 
     panel_key <- paste(loc, site, sep = "|")
 
-    temp_panels[[panel_key]]    <- make_pred_plot(site_df, site, show_legend = TRUE)
+    temp_panels[[panel_key]]    <- make_pred_plot(head(site_df, 96), site, show_legend = TRUE)
     excerpt_panels[[panel_key]] <- make_pred_plot(head(site_df, 96), site, show_legend = TRUE)
     daily_ext[[panel_key]]      <- compute_daily_stats(site_df)
 

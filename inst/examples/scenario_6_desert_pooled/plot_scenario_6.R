@@ -76,7 +76,7 @@ for (site in sites_d) {
   daily_ext[[site]]  <- compute_daily_stats(full_df)
 
   if (site %in% sites_d_sample) {
-    temp_panels[[site]]    <- make_pred_plot(full_df, site, show_legend = TRUE)
+    temp_panels[[site]]    <- make_pred_plot(head(full_df, 96), site, show_legend = TRUE)
     excerpt_panels[[site]] <- make_pred_plot(head(full_df, 96), site, show_legend = TRUE)
     xlim_site <- range(c(full_df$measured - full_df$base, full_df$measured - full_df$rf, full_df$measured - full_df$lstm), na.rm = TRUE)
     hist_panels[[site]] <- make_residual_hist(full_df, site, xlim = xlim_site, show_strip = TRUE, show_legend = TRUE, strip_text_size = 11)

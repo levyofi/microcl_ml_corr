@@ -55,7 +55,7 @@ for (i in seq_along(locs_s8)) {
 
   letter_val <- c("(a)", "(b)", "(c)")[i]
 
-  temp_panels[[loc]]    <- make_pred_plot(site_df, loc, show_legend = TRUE, has_lstm = FALSE, panel_letter = letter_val)
+  temp_panels[[loc]]    <- make_pred_plot(head(site_df, 96), loc, show_legend = TRUE, has_lstm = FALSE, panel_letter = letter_val)
   excerpt_panels[[loc]] <- make_pred_plot(head(site_df, 96), loc, show_legend = TRUE, has_lstm = FALSE, panel_letter = letter_val)
   daily_ext[[loc]]      <- compute_daily_stats(full_df_loc)
 

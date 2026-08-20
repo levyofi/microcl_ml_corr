@@ -66,7 +66,7 @@ for (task in tasks_s1) {
   full_dfs[[task$name]] <- full_df
 
   letter_val <- c("harod2_air"="(a)", "harod2_sun"="(b)", "harod2_shd"="(c)")[task$name]
-  temp_panels[[task$name]]    <- make_pred_plot(full_df, task$title,
+  temp_panels[[task$name]]    <- make_pred_plot(head(full_df, 96), task$title,
                                                  show_legend = TRUE, panel_letter = letter_val)
   excerpt_panels[[task$name]] <- make_pred_plot(head(full_df, 96), task$title,
                                                  show_legend = TRUE, panel_letter = letter_val)

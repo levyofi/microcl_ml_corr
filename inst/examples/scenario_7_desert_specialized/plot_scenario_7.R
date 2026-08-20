@@ -107,7 +107,7 @@ for (loc in locs_s7) {
       let_val <- site_letters_s7[site]
       if (is.na(let_val)) let_val <- NULL
       
-      temp_panels[[site]]    <- make_pred_plot(full_df, panel_title, show_legend = TRUE, panel_letter = let_val)
+      temp_panels[[site]]    <- make_pred_plot(head(full_df, 96), panel_title, show_legend = TRUE, panel_letter = let_val)
       excerpt_panels[[site]] <- make_pred_plot(head(full_df, 96), panel_title, show_legend = TRUE, panel_letter = let_val)
       
       xlim_site <- range(c(full_df$measured - full_df$base,

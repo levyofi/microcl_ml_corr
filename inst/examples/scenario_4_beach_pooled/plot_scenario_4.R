@@ -83,7 +83,7 @@ for (site in sites_b) {
   let_val <- site_letters_s4[site]
   if (is.na(let_val)) let_val <- NULL
 
-  temp_panels[[site]]    <- make_pred_plot(site_df, site, show_legend = TRUE, panel_letter = let_val)
+  temp_panels[[site]]    <- make_pred_plot(head(site_df, 96), site, show_legend = TRUE, panel_letter = let_val)
   excerpt_panels[[site]] <- make_pred_plot(head(site_df, 96), site, show_legend = TRUE, panel_letter = let_val)
   daily_ext[[site]]      <- compute_daily_stats(site_df)
 

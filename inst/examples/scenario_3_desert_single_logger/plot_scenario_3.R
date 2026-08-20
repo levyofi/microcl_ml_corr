@@ -54,7 +54,7 @@ for (task in tasks_s3) {
   full_df <- build_pred_df(rf_test, rf_bundle$feature_cols, rf_bundle$model, base_test_lstm, lstm_bundle$model, X_test_lstm)
   full_df <- full_df[order(full_df$time), ]
 
-  temp_panels[[task$name]]    <- make_pred_plot(full_df, task$title, show_legend = TRUE)
+  temp_panels[[task$name]]    <- make_pred_plot(head(full_df, 96), task$title, show_legend = TRUE)
   excerpt_panels[[task$name]] <- make_pred_plot(head(full_df, 96), task$title, show_legend = TRUE)
   hist_panels[[task$name]]    <- make_residual_hist(full_df, task$title, show_legend = TRUE, strip_text_size = 11)
   daily_ext[[task$name]]      <- compute_daily_stats(full_df)
