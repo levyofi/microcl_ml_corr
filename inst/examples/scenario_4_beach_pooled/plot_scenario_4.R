@@ -97,10 +97,6 @@ grid_temp <- list(
   NULL,                           temp_panels[["Rosh_HaNikra 45 m"]], NULL
 )
 
-ggsave(file.path(SCENARIO_DIR, "temporal_predictions_beach_pooled.png"),
-       ggpubr::ggarrange(plotlist = unname(grid_temp), ncol = 3, nrow = 3, common.legend = TRUE, legend = "bottom"),
-       width = 15, height = 12, dpi = 300)
-
 grid_excerpt <- list(
   excerpt_panels[["Range_24 25 m"]], excerpt_panels[["Rosh_HaNikra 15 m"]], excerpt_panels[["Ashkelon 10 m"]],
   excerpt_panels[["Range_24 45 m"]], excerpt_panels[["Rosh_HaNikra 25 m"]], excerpt_panels[["Ashkelon 15 m"]],

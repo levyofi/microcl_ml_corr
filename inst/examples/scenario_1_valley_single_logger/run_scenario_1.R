@@ -184,10 +184,6 @@ ggsave(file.path(SCENARIO_DIR, "prediction_examples_valley.png"),
        grid.arrange(grobs = plot_list, ncol = 3), width = 15, height = 5, dpi = 300)
 
 # ── Save full test-set temporal plots ─────────────────────────────────────────
-ggsave(file.path(SCENARIO_DIR, "temporal_predictions_valley.png"),
-       grid.arrange(grobs = temp_plot_list, ncol = 1),
-       width = 12, height = 10, dpi = 300)
-
 # ── Save temperature statistics table ─────────────────────────────────────────
 stats_df <- do.call(rbind, stats_list)
 write.csv(stats_df, file.path(RESULTS_DIR, "logger_temp_stats.csv"), row.names = FALSE)

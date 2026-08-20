@@ -173,10 +173,6 @@ write.csv(results_df,
           file.path(RESULTS_DIR, "zero_shot_results.csv"),
           row.names = FALSE)
 
-ggsave(file.path(SCENARIO_DIR, "temporal_predictions_zero_shot.png"),
-       grid.arrange(grobs = plot_panels, ncol = 1),
-       width = 12, height = 10, dpi = 300)
-
 ggsave(file.path(SCENARIO_DIR, "prediction_examples_zero_shot.png"),
        grid.arrange(grobs = excerpt_panels, ncol = 3),
        width = 15, height = 5, dpi = 300)

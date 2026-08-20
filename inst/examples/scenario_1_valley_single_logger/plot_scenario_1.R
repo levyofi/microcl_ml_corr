@@ -73,10 +73,6 @@ for (task in tasks_s1) {
   daily_ext[[task$name]]      <- compute_daily_stats(full_df)
 }
 
-ggsave(file.path(SCENARIO_DIR, "temporal_predictions_valley.png"),
-       ggpubr::ggarrange(plotlist = unname(temp_panels), ncol = 1, common.legend = TRUE, legend = "top"),
-       width = 12, height = 10, dpi = 300)
-
 ggsave(file.path(SCENARIO_DIR, "prediction_examples_valley.png"),
        ggpubr::ggarrange(plotlist = unname(excerpt_panels), ncol = 1, common.legend = TRUE, legend = "top"),
        width = 12, height = 10, dpi = 300)

@@ -173,11 +173,6 @@ ggsave(file.path(SCENARIO_DIR, "prediction_examples_beach.png"),
        width = 8, height = 4.5, dpi = 300)
 
 # Full test-set temporal plot
-ggsave(file.path(SCENARIO_DIR, "temporal_predictions_beach.png"),
-       make_pred_plot(full_df,
-                      "Coastal Beach (Ashkelon 15 m) — Full Test Set"),
-       width = 12, height = 5, dpi = 300)
-
 # ── Daily min / mean / max statistics ─────────────────────────────────────────
 cat("\nDaily min / mean / max — RMSE, ME, SD (°C):\n")
 print_daily_stats(compute_daily_stats(full_df), paste0("Beach - ", SITE))

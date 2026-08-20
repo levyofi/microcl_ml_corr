@@ -63,10 +63,6 @@ for (i in seq_along(locs_s8)) {
   hist_panels[[loc]] <- make_residual_hist(full_df_loc, loc, has_lstm = FALSE, xlim = xlim_site, show_strip = TRUE, show_legend = TRUE, panel_letter = letter_val, strip_text_size = 11)
 }
 
-ggsave(file.path(SCENARIO_DIR, "temporal_predictions_zero_shot.png"),
-       ggpubr::ggarrange(plotlist = unname(temp_panels), ncol = 3, common.legend = TRUE, legend = "top"),
-       width = 15, height = 5, dpi = 300)
-
 ggsave(file.path(SCENARIO_DIR, "prediction_examples_zero_shot.png"),
        ggpubr::ggarrange(plotlist = unname(excerpt_panels), ncol = 3, common.legend = TRUE, legend = "top"),
        width = 15, height = 5, dpi = 300)

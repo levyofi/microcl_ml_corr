@@ -141,10 +141,6 @@ grid_s7_temp <- list(
   temp_panels[["Bush_M_T_1_W"]], temp_panels[["Rock_M_T_1_W"]], temp_panels[["Rock_L_T_2_W"]]
 )
 
-ggsave(file.path(SCENARIO_DIR, "temporal_predictions_desert_specialized.png"),
-       arrange_with_rows(grid_s7_temp),
-       width = 15, height = 8, dpi = 300)
-
 grid_s7_excerpt <- list(
   excerpt_panels[["Bush_S_M_1_W"]], excerpt_panels[["Bush_M_M_1_W"]], excerpt_panels[["Rock_L_M_1_W"]],
   excerpt_panels[["Bush_M_T_1_W"]], excerpt_panels[["Rock_M_T_1_W"]], excerpt_panels[["Rock_L_T_2_W"]]

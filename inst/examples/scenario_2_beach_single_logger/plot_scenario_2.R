@@ -55,11 +55,6 @@ full_df <- full_df[order(full_df$time), ]
 
 label_s2 <- paste0("Coastal Beach (", SITE, ")")
 
-ggsave(file.path(SCENARIO_DIR, "temporal_predictions_beach.png"),
-       make_pred_plot(head(full_df, 96), paste0(label_s2, " — 4-Day Excerpt"),
-                      show_legend = TRUE),
-       width = 12, height = 5, dpi = 300)
-
 ggsave(file.path(SCENARIO_DIR, "prediction_examples_beach.png"),
        make_pred_plot(head(full_df, 96), paste0(label_s2, " — First 120 Hours"),
                       show_legend = TRUE),
