@@ -31,12 +31,12 @@ cat("\n=== Scenario 1: Valley (Harod) ===\n")
 
 DATA_PATH    <- system.file("extdata", "Harod_dataset.csv", package = "microclCorr")
 SCENARIO_DIR <- "scenario_1_valley_single_logger"
-RESULTS_DIR <- file.path("../../NichMapR_ml_corr/microcl_ml_corr/inst/examples", SCENARIO_DIR, "results")
+RESULTS_DIR <- file.path(SCENARIO_DIR, "results")
 
 tasks_s1 <- list(
-  list(name = "harod2_sun", site = "harod2_sun.csv", title = "Valley - Sun"),
-  list(name = "harod2_shd", site = "harod2_shd.csv", title = "Valley - Shade"),
-  list(name = "harod2_air", site = "harod2_air.csv", title = "Valley - Air")
+  list(name = "harod2_air", site = "harod2_air.csv", title = "Air"),
+  list(name = "harod2_sun", site = "harod2_sun.csv", title = "Sun"),
+  list(name = "harod2_shd", site = "harod2_shd.csv", title = "Shade")
 )
 
 temp_panels    <- list()
@@ -76,16 +76,36 @@ for (task in tasks_s1) {
   full_df <- full_df[order(full_df$time), ]
   full_dfs[[task$name]] <- full_df
 
-  is_first <- task$name == tasks_s1[[1]]$name
+  letter_val <- c("harod2_air"="(a)", "harod2_sun"="(b)", "harod2_shd"="(c)")[task$name]
+  is_first   <- task$name == tasks_s1[[1]]$name
   temp_panels[[task$name]]    <- make_pred_plot(full_df, task$title,
-                                                 show_legend = is_first)
-  excerpt_panels[[task$name]] <- make_pred_plot(head(full_df, 120), task$title,
-                                                 show_legend = is_first)
+                                                 show_legend = is_first, panel_letter = letter_val)
+  excerpt_panels[[task$name]] <- make_pred_plot(head(full_df, 96), task$title,
+                                                 show_legend = is_first, panel_letter = letter_val)
   daily_ext[[task$name]]      <- compute_daily_stats(full_df)
 }
 
+ggsave(file.path(SCENARIO_DIR, "temporal_predictions_valley.png"),
+       ggpubr::ggarrange(plotlist = temp_panels, ncol = 1, common.legend = TRUE, legend = "top"),
+       width = 12, height = 10, dpi = 300)
+
+ggsave(file.path(SCENARIO_DIR, "prediction_examples_valley.png"),
+       ggpubr::ggarrange(plotlist = excerpt_panels, ncol = 1, common.legend = TRUE, legend = "top"),
+       width = 12, height = 10, dpi = 300)
+
 # Per-task x limits: each column uses its own range so narrow distributions
 # (e.g. Air) are not squished by wide ones (e.g. Sun).
+# Panel letters go row by row:
+# Row 1 (NicheMapR): (a) Air, (b) Sun, (c) Shade
+# Row 2 (RF):       (d) Air, (e) Sun, (f) Shade
+# Row 3 (LSTM):     (g) Air, (h) Sun, (i) Shade
+
+col_letters_s1 <- list(
+  c("(a)", "(d)", "(g)"),  # Air
+  c("(b)", "(e)", "(h)"),  # Sun
+  c("(c)", "(f)", "(i)")   # Shade
+)
+
 for (i in seq_along(tasks_s1)) {
   task <- tasks_s1[[i]]
   df   <- full_dfs[[task$name]]
@@ -95,20 +115,20 @@ for (i in seq_along(tasks_s1)) {
   hist_panels[[task$name]] <- make_residual_hist(
     df, task$title,
     xlim = xlim_task, show_strip = (i == length(tasks_s1)),
-    show_legend = TRUE)
+    show_legend = TRUE, panel_letters = col_letters_s1[[i]],
+    axis_title_size = 18, axis_text_size = 15, strip_text_size = 15)
 }
 
-ggsave(file.path(SCENARIO_DIR, "temporal_predictions_valley.png"),
-       grid.arrange(grobs = temp_panels, ncol = 1),
-       width = 12, height = 10, dpi = 300)
-
-ggsave(file.path(SCENARIO_DIR, "prediction_examples_valley.png"),
-       grid.arrange(grobs = excerpt_panels, ncol = 3),
-       width = 15, height = 5, dpi = 300)
+p_grid_s1 <- cowplot::plot_grid(
+  hist_panels[[1]], hist_panels[[2]], hist_panels[[3]],
+  ncol = 3, align = "h", axis = "tb"
+)
+leg_s1 <- ggpubr::get_legend(hist_panels[[1]] + ggplot2::theme(legend.position = "bottom"))
+fig4_final <- cowplot::plot_grid(p_grid_s1, leg_s1, ncol = 1, rel_heights = c(1, 0.08))
 
 ggsave(file.path(SCENARIO_DIR, "residual_histogram_valley.png"),
-       ggpubr::ggarrange(plotlist = hist_panels, ncol = 3, nrow = 1, common.legend = TRUE, legend = "bottom"),
-       width = 15, height = 5.5, dpi = 300)
+       fig4_final,
+       width = 15, height = 8, dpi = 300)
 
 stats_df <- do.call(rbind, stats_list)
 write.csv(stats_df, file.path(RESULTS_DIR, "logger_temp_stats.csv"), row.names = FALSE)
@@ -126,7 +146,7 @@ SITE      <- "Ashkelon 15 m"
 SITE_COL  <- "time_series_site"
 DATA_PATH <- system.file("extdata", "Beach_data_preprocessed.csv", package = "microclCorr")
 SCENARIO_DIR <- "scenario_2_beach_single_logger"
-RESULTS_DIR <- file.path("../../NichMapR_ml_corr/microcl_ml_corr/inst/examples", SCENARIO_DIR, "results")
+RESULTS_DIR <- file.path(SCENARIO_DIR, "results")
 
 data <- load_prepared_csv_data(DATA_PATH, is_continuous_microhabitat = FALSE,
                                datetime_format = "%Y-%m-%d %H:%M:%S",
@@ -165,7 +185,7 @@ ggsave(file.path(SCENARIO_DIR, "temporal_predictions_beach.png"),
        width = 12, height = 5, dpi = 300)
 
 ggsave(file.path(SCENARIO_DIR, "prediction_examples_beach.png"),
-       make_pred_plot(head(full_df, 120), paste0(label_s2, " — First 120 Hours"),
+       make_pred_plot(head(full_df, 96), paste0(label_s2, " — First 120 Hours"),
                       show_legend = TRUE),
        width = 8, height = 4.5, dpi = 300)
 
@@ -186,7 +206,7 @@ cat("\n=== Scenario 3: Judean Desert (Tzeelim) ===\n")
 SITE_COL_3 <- "site_id"
 DATA_PATH  <- system.file("extdata", "desert_data_preprocessed.csv", package = "microclCorr")
 SCENARIO_DIR <- "scenario_3_desert_single_logger"
-RESULTS_DIR <- file.path("../../NichMapR_ml_corr/microcl_ml_corr/inst/examples", SCENARIO_DIR, "results")
+RESULTS_DIR <- file.path(SCENARIO_DIR, "results")
 
 tasks_s3 <- list(
   list(name = "Rock_S_T_2_W", site = "Rock_S_T_2_W", title = "Desert - Rock"),
@@ -230,7 +250,7 @@ for (task in tasks_s3) {
   is_first <- task$name == tasks_s3[[1]]$name
   temp_panels[[task$name]]    <- make_pred_plot(full_df, task$title,
                                                  show_legend = is_first)
-  excerpt_panels[[task$name]] <- make_pred_plot(head(full_df, 120), task$title,
+  excerpt_panels[[task$name]] <- make_pred_plot(head(full_df, 96), task$title,
                                                  show_legend = is_first)
   hist_panels[[task$name]]    <- make_residual_hist(full_df, task$title)
   daily_ext[[task$name]]      <- compute_daily_stats(full_df)
@@ -263,7 +283,7 @@ cat("\n=== Scenario 4: Beach Pooled ===\n")
 DATA_PATH_B   <- system.file("extdata", "Beach_data_preprocessed.csv", package = "microclCorr")
 SPLITS_PATH_B <- system.file("extdata", "beach_splits.csv", package = "microclCorr")
 SCENARIO_DIR <- "scenario_4_beach_pooled"
-RESULTS_DIR <- file.path("../../NichMapR_ml_corr/microcl_ml_corr/inst/examples", SCENARIO_DIR, "results")
+RESULTS_DIR <- file.path(SCENARIO_DIR, "results")
 SITE_COL_B    <- "time_series_site"
 
 data_b <- load_prepared_csv_data(DATA_PATH_B, is_continuous_microhabitat = FALSE,
@@ -321,6 +341,12 @@ daily_ext      <- list()
 stats_list     <- list()
 full_dfs_b     <- list()
 
+site_letters_s4 <- c(
+  "Range_24 25 m" = "(a)", "Rosh_HaNikra 15 m" = "(b)", "Ashkelon 10 m" = "(c)",
+  "Range_24 45 m" = "(d)", "Rosh_HaNikra 25 m" = "(e)", "Ashkelon 15 m" = "(f)",
+  "Rosh_HaNikra 45 m" = "(g)"
+)
+
 for (site in sites_b) {
   mask    <- rf_test_b[[SITE_COL_B]] == site
   site_df <- full_df_b[mask, ]
@@ -330,9 +356,12 @@ for (site in sites_b) {
   site_data <- data_b[data_b[[SITE_COL_B]] == site, ]
   stats_list[[site]] <- logger_temp_stats(site_data, site)
 
-  temp_panels[[site]]    <- make_pred_plot(site_df, site, show_legend = TRUE)
-  excerpt_panels[[site]] <- make_pred_plot(head(site_df, 120), site,
-                                            show_legend = TRUE)
+  let_val <- site_letters_s4[site]
+  if (is.na(let_val)) let_val <- NULL
+
+  temp_panels[[site]]    <- make_pred_plot(site_df, site, show_legend = TRUE, panel_letter = let_val)
+  excerpt_panels[[site]] <- make_pred_plot(head(site_df, 96), site,
+                                            show_legend = TRUE, panel_letter = let_val)
   daily_ext[[site]]      <- compute_daily_stats(site_df)
 
   xlim_site <- range(c(site_df$measured - site_df$base,
@@ -387,7 +416,7 @@ cat("  Saved all outputs (Beach Pooled)\n")
 cat("\n=== Scenario 5: Beach Specialized ===\n")
 
 SCENARIO_DIR <- "scenario_5_beach_specialized"
-RESULTS_DIR <- file.path("../../NichMapR_ml_corr/microcl_ml_corr/inst/examples", SCENARIO_DIR, "results")
+RESULTS_DIR <- file.path(SCENARIO_DIR, "results")
 
 # splits_b / data_b / SITE_COL_B reused from Scenario 4
 locs_s5        <- c("Ashkelon", "Range_24", "Rosh_HaNikra")
@@ -453,7 +482,7 @@ for (loc in locs_s5) {
     is_first  <- (loc == locs_s5[1]) && (site == sites_loc[1])
 
     temp_panels[[panel_key]]    <- make_pred_plot(site_df, site, show_legend = is_first)
-    excerpt_panels[[panel_key]] <- make_pred_plot(head(site_df, 120), site,
+    excerpt_panels[[panel_key]] <- make_pred_plot(head(site_df, 96), site,
                                                    show_legend = is_first)
     daily_ext[[panel_key]]      <- compute_daily_stats(site_df)
 
@@ -496,7 +525,7 @@ cat("\n=== Scenario 6: Desert Pooled ===\n")
 DATA_PATH_D   <- system.file("extdata", "desert_data_preprocessed.csv", package = "microclCorr")
 SPLITS_PATH_D <- system.file("extdata", "desert_splits.csv", package = "microclCorr")
 SCENARIO_DIR <- "scenario_6_desert_pooled"
-RESULTS_DIR <- file.path("../../NichMapR_ml_corr/microcl_ml_corr/inst/examples", SCENARIO_DIR, "results")
+RESULTS_DIR <- file.path(SCENARIO_DIR, "results")
 SITE_COL_D    <- "site_id"
 
 data_d <- load_prepared_csv_data(DATA_PATH_D,
@@ -559,7 +588,7 @@ for (site in sites_d) {
   if (site %in% sites_d_sample) {
     is_first <- site == sites_d_sample[1]
     temp_panels[[site]]    <- make_pred_plot(full_df, site, show_legend = is_first)
-    excerpt_panels[[site]] <- make_pred_plot(head(full_df, 120), site,
+    excerpt_panels[[site]] <- make_pred_plot(head(full_df, 96), site,
                                               show_legend = is_first)
     xlim_site <- range(c(full_df$measured - full_df$base,
                           full_df$measured - full_df$rf,
@@ -595,7 +624,7 @@ cat("  Saved all outputs (Desert Pooled)\n")
 cat("\n=== Scenario 7: Desert Specialized ===\n")
 
 SCENARIO_DIR <- "scenario_7_desert_specialized"
-RESULTS_DIR <- file.path("../../NichMapR_ml_corr/microcl_ml_corr/inst/examples", SCENARIO_DIR, "results")
+RESULTS_DIR <- file.path(SCENARIO_DIR, "results")
 
 # splits_d / data_d / SITE_COL_D reused from Scenario 6
 locs_s7        <- c("Mishmar", "Tzeelim")
@@ -669,11 +698,17 @@ for (loc in locs_s7) {
         "Rock_M_T_1_W" = "Medium rock",
         "Rock_L_T_2_W" = "Large rock"
       )
+      site_letters_s7 <- c(
+        "Bush_S_M_1_W" = "(a)", "Bush_M_M_1_W" = "(b)", "Rock_L_M_1_W" = "(c)",
+        "Bush_M_T_1_W" = "(d)", "Rock_M_T_1_W" = "(e)", "Rock_L_T_2_W" = "(f)"
+      )
       panel_title <- clean_names[site]
       if (is.na(panel_title)) panel_title <- site
+      let_val <- site_letters_s7[site]
+      if (is.na(let_val)) let_val <- NULL
       
-      temp_panels[[site]]    <- make_pred_plot(full_df, panel_title, show_legend = TRUE)
-      excerpt_panels[[site]] <- make_pred_plot(head(full_df, 120), panel_title, show_legend = TRUE)
+      temp_panels[[site]]    <- make_pred_plot(full_df, panel_title, show_legend = TRUE, panel_letter = let_val)
+      excerpt_panels[[site]] <- make_pred_plot(head(full_df, 96), panel_title, show_legend = TRUE, panel_letter = let_val)
       
       xlim_site <- range(c(full_df$measured - full_df$base,
                             full_df$measured - full_df$rf,
@@ -734,41 +769,75 @@ cat("  Saved all outputs (Desert Specialized)\n")
 # =============================================================================
 # SCENARIO 8: Zero-Shot Transfer — RF only, no reloadable per-strategy models
 # =============================================================================
+# =============================================================================
+# SCENARIO 8: Zero-Shot Spatial Transfer
+# =============================================================================
 cat("\n=== Scenario 8: Zero-Shot Transfer ===\n")
 
 SCENARIO_DIR <- "scenario_8_zero_shot_transfer"
-RESULTS_DIR <- file.path("../../NichMapR_ml_corr/microcl_ml_corr/inst/examples", SCENARIO_DIR, "results")
+RESULTS_DIR <- file.path(SCENARIO_DIR, "results")
 
-# Residual histogram: before correction only (no per-strategy saved models)
-# Use beach test split residuals (splits_b reused from S4/S5)
-full_df_s8_base <- data.frame(
-  measured = splits_b$test$predicted + splits_b$test$residual,
-  base     = splits_b$test$predicted,
-  rf       = splits_b$test$predicted   # placeholder — no single model for S8
-)
-# For S8 only show NicheMapR before vs zero-shot strategy A residuals per location
-# Re-derive corrected predictions from saved results CSV (no model files to reload)
-res8 <- read.csv(file.path(RESULTS_DIR, "zero_shot_results.csv"))
+# splits_b / data_b / SITE_COL_B reused from Scenario 4
+locs_s8        <- c("Ashkelon", "Range_24", "Rosh_HaNikra")
+temp_panels    <- list()
+excerpt_panels <- list()
+hist_panels    <- list()
+daily_ext      <- list()
+stats_list     <- list()
 
-# S8: no per-strategy models saved — show NicheMapR residuals only (1 facet)
-res_base_s8 <- splits_b$test$residual  # measured - NicheMapR (already the residual column)
-df_s8 <- data.frame(residual = res_base_s8, model = "NicheMapR (before)")
-df_s8$model <- factor(df_s8$model, levels = "NicheMapR (before)")
-mn_s8 <- round(mean(res_base_s8), 2); sd_s8 <- round(sd(res_base_s8), 2)
-p_s8 <- ggplot2::ggplot(df_s8, ggplot2::aes(x = residual)) +
-  ggplot2::geom_histogram(bins = 50, fill = "#ef4444", colour = "white", alpha = 0.85) +
-  ggplot2::geom_vline(xintercept = 0, linetype = "dashed", linewidth = 0.7, colour = "#333333") +
-  ggplot2::annotate("text", x = Inf, y = Inf, hjust = 1.05, vjust = 1.4, size = 3.2,
-                    label = sprintf("mean %+.2f °C\nSD %.2f °C", mn_s8, sd_s8)) +
-  ggplot2::labs(title = "Beach — NicheMapR Residuals (Test Set, All Locations)\n(No after-correction: per-strategy models not saved; see run_scenario_8.R)",
-                x = "Residual: Measured − NicheMapR (°C)", y = "Count") +
-  ggplot2::theme_minimal(base_size = 10) +
-  ggplot2::theme(plot.title = ggplot2::element_text(face = "bold", hjust = 0.5, size = 9),
-                 panel.grid.minor = ggplot2::element_blank())
+for (i in seq_along(locs_s8)) {
+  loc <- locs_s8[i]
+  rf_bundle_loc <- load_correction_model(
+    file.path(RESULTS_DIR, paste0("rf_zeroshot_", loc, "_model.rds")))
+
+  test_loc <- splits_b$test[splits_b$test$location == loc, ]
+  
+  rf_preds_loc <- test_loc$predicted +
+    ranger:::predict.ranger(rf_bundle_loc$model,
+      data = as.data.frame(test_loc[, rf_bundle_loc$feature_cols]))$predictions
+
+  full_df_loc <- data.frame(
+    time     = test_loc$time,
+    measured = test_loc$predicted + test_loc$residual,
+    base     = test_loc$predicted,
+    rf       = rf_preds_loc
+  )
+  full_df_loc[[SITE_COL_B]] <- test_loc[[SITE_COL_B]]
+
+  # Average across sensors for this location for visual clarity in excerpt
+  site_df <- aggregate(cbind(measured, base, rf) ~ time, data = full_df_loc, FUN = mean)
+  site_df <- site_df[order(site_df$time), ]
+
+  letter_val <- c("(a)", "(b)", "(c)")[i]
+  is_first   <- i == 1
+
+  temp_panels[[loc]]    <- make_pred_plot(site_df, loc, show_legend = is_first,
+                                          has_lstm = FALSE, panel_letter = letter_val)
+  excerpt_panels[[loc]] <- make_pred_plot(head(site_df, 96), loc, show_legend = is_first,
+                                          has_lstm = FALSE, panel_letter = letter_val)
+  daily_ext[[loc]]      <- compute_daily_stats(full_df_loc)
+
+  xlim_site <- range(c(full_df_loc$measured - full_df_loc$base,
+                        full_df_loc$measured - full_df_loc$rf), na.rm = TRUE)
+  hist_panels[[loc]] <- make_residual_hist(full_df_loc, loc, has_lstm = FALSE,
+                                           xlim = xlim_site, show_strip = (i == length(locs_s8)),
+                                           show_legend = TRUE, panel_letter = letter_val)
+}
+
+ggsave(file.path(SCENARIO_DIR, "temporal_predictions_zero_shot.png"),
+       ggpubr::ggarrange(plotlist = temp_panels, ncol = 3, common.legend = TRUE, legend = "top"),
+       width = 15, height = 5, dpi = 300)
+
+ggsave(file.path(SCENARIO_DIR, "prediction_examples_zero_shot.png"),
+       ggpubr::ggarrange(plotlist = excerpt_panels, ncol = 3, common.legend = TRUE, legend = "top"),
+       width = 15, height = 5, dpi = 300)
+
 ggsave(file.path(SCENARIO_DIR, "residual_histogram_zero_shot.png"),
-       p_s8, width = 7, height = 4.5, dpi = 300)
+       ggpubr::ggarrange(plotlist = hist_panels, ncol = 3, common.legend = TRUE, legend = "bottom"),
+       width = 15, height = 6, dpi = 300)
 
-# Re-generate the bar chart from saved results
+# Re-generate zero-shot strategy comparison bar chart from saved results CSV
+res8 <- read.csv(file.path(RESULTS_DIR, "zero_shot_results.csv"))
 res8$strategy <- factor(res8$strategy,
   levels = c("B: Specialized (Local Data)", "C: Pooled (All Sites)",
              "D: Pooled (Downsampled to N)", "A: Zero-Shot (Nearby Sites)"))
@@ -776,28 +845,25 @@ res8$strategy <- factor(res8$strategy,
 p8 <- ggplot(res8, aes(x = target, y = rmse_corr, fill = strategy)) +
   geom_bar(stat = "identity", position = position_dodge(0.85), width = 0.75) +
   geom_hline(aes(yintercept = rmse_base), linetype = "dashed",
-             color = "#ef4444", linewidth = 0.7) +
+             color = "#dc2626", linewidth = 0.7) +
   scale_fill_manual(values = c(
-    "B: Specialized (Local Data)"    = "#10b981",
-    "C: Pooled (All Sites)"          = "#3b82f6",
+    "B: Specialized (Local Data)"    = "#059669",
+    "C: Pooled (All Sites)"          = "#2563eb",
     "D: Pooled (Downsampled to N)"   = "#8b5cf6",
     "A: Zero-Shot (Nearby Sites)"    = "#f59e0b")) +
-  labs(title    = "Zero-Shot Transfer: Can we correct an unseen location?",
-       subtitle = "Red dashed line = uncorrected NicheMapR error",
-       x        = "Target Location (held out during training)",
+  labs(title    = "Zero-Shot Spatial Transfer: Performance Across Target Locations",
+       subtitle = "Dashed red line = uncorrected NicheMapR physical model baseline error",
+       x        = "Target Location (Held-Out During Training)",
        y        = "Corrected RMSE (°C)",
        fill     = "Training Strategy") +
-  theme_minimal(base_size = 11) +
-  theme(plot.title    = element_text(face = "bold", hjust = 0.5),
-        plot.subtitle = element_text(hjust = 0.5, color = "#666666"),
+  theme_minimal(base_size = 14) +
+  theme(plot.title    = element_text(face = "bold", hjust = 0.5, size = 16),
+        plot.subtitle = element_text(hjust = 0.5, color = "#444444", size = 12),
         legend.position = "bottom") +
   guides(fill = guide_legend(nrow = 2))
 
 ggsave(file.path(SCENARIO_DIR, "zero_shot_transfer.png"),
        p8, width = 10, height = 6, dpi = 300)
 
-cat("  Saved residual histogram + zero-shot bar chart (S8)\n")
-cat("  Note: S8 histogram shows NicheMapR residuals only — no reloadable\n")
-cat("        per-strategy models; see run_scenario_8.R to re-train.\n")
-
+cat("  Saved zero-shot time series, residual histograms, and strategy comparison chart (S8)\n")
 cat("\n=== All done ===\n")

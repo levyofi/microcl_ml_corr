@@ -262,7 +262,9 @@ logger_temp_stats <- function(data_subset, label) {
 #
 # Residuals are defined as measured − model, so positive = model under-predicts.
 make_residual_hist <- function(full_df, title_str, has_lstm = TRUE,
-                               xlim = NULL, show_strip = TRUE, show_legend = TRUE) {
+                               xlim = NULL, show_strip = TRUE, show_legend = TRUE,
+                               panel_letter = NULL, panel_letters = NULL,
+                               axis_title_size = 18, axis_text_size = 15, strip_text_size = 11) {
   required <- c("measured", "base", "rf")
   missing  <- setdiff(required, names(full_df))
   if (length(missing) > 0)
@@ -285,83 +287,122 @@ make_residual_hist <- function(full_df, title_str, has_lstm = TRUE,
   res_rf   <- full_df$measured - full_df$rf
 
   rows <- list(
-    data.frame(residual = res_base, model = "NicheMapR (before)"),
-    data.frame(residual = res_rf,   model = "RF (after)")
+    data.frame(residual = res_base, model = "Uncorrected
+NicheMapR"),
+    data.frame(residual = res_rf,   model = "Random Forest
+Correction")
   )
 
   if (has_lstm && "lstm" %in% names(full_df)) {
     rows[[3]] <- data.frame(residual = full_df$measured - full_df$lstm,
-                            model    = "LSTM (after)")
+                            model    = "LSTM
+Correction")
   }
 
   df_long <- do.call(rbind, rows)
-  df_long$model <- factor(df_long$model,
-    levels = c("NicheMapR (before)", "RF (after)", "LSTM (after)"))
+  model_levels <- c("Uncorrected
+NicheMapR", "Random Forest
+Correction", "LSTM
+Correction")
+  clean_labels <- c("Uncorrected NicheMapR", "Random Forest Correction", "LSTM Correction")
+  if (!has_lstm) {
+    model_levels <- c("Uncorrected
+NicheMapR", "Random Forest
+Correction")
+    clean_labels <- c("Uncorrected NicheMapR", "Random Forest Correction")
+  }
+  df_long$model <- factor(df_long$model, levels = model_levels)
 
-  cols <- c("NicheMapR (before)" = "#ef4444",
-            "RF (after)"         = "#10b981",
-            "LSTM (after)"       = "#3b82f6")
+  cols <- c("Uncorrected
+NicheMapR"   = "#dc2626",
+            "Random Forest
+Correction" = "#059669",
+            "LSTM
+Correction"         = "#2563eb")
 
   if (is.null(xlim)) xlim <- range(df_long$residual, na.rm = TRUE)
 
   p <- ggplot2::ggplot(df_long, ggplot2::aes(x = residual, fill = model)) +
-    ggplot2::geom_histogram(bins = 50, position = "identity", colour = "white", alpha = 0.5) +
+    ggplot2::geom_histogram(bins = 50, position = "identity", colour = "white", alpha = 0.8) +
     ggplot2::geom_vline(xintercept = 0, linetype = "dashed",
                         linewidth = 0.7, colour = "#333333") +
+    ggplot2::facet_wrap(~ model, ncol = 1, scales = "fixed", strip.position = "right") +
     ggplot2::coord_cartesian(xlim = xlim) +
-    ggplot2::scale_fill_manual(values = cols) +
+    ggplot2::scale_fill_manual(values = cols,
+                               breaks = model_levels,
+                               labels = clean_labels) +
     ggplot2::labs(
       title = title_str,
       x     = expression("Prediction errors (" * degree * "C)"),
       y     = "Count",
       fill  = NULL) +
-    ggplot2::theme_minimal(base_size = 18) +
+    ggplot2::theme_minimal(base_size = 14) +
     ggplot2::theme(
-      aspect.ratio       = 1,
-      plot.title         = ggplot2::element_text(face = "bold", hjust = 0.5, size = 20),
-      axis.title         = ggplot2::element_text(size = 18),
-      axis.text          = ggplot2::element_text(size = 16),
-      legend.position    = "bottom",
-      legend.text        = ggplot2::element_text(size = 16),
-      panel.grid.major   = ggplot2::element_blank(),
-      panel.grid.minor   = ggplot2::element_blank(),
-      panel.border       = ggplot2::element_rect(colour = "black", fill = NA,
-                                                  linewidth = 0.8))
-  
-  if (!show_legend) {
-    p <- p + ggplot2::theme(legend.position = "none")
+      plot.title       = ggplot2::element_text(face = "bold", hjust = 0.5, size = 20),
+      axis.title       = ggplot2::element_text(face = "bold", size = axis_title_size),
+      axis.text        = ggplot2::element_text(size = axis_text_size),
+      legend.position  = "none",
+      strip.text.y     = if (show_strip) ggplot2::element_text(face = "bold", size = strip_text_size, angle = 270) else ggplot2::element_blank(),
+      strip.background = ggplot2::element_blank(),
+      panel.grid.major = ggplot2::element_blank(),
+      panel.grid.minor = ggplot2::element_blank(),
+      panel.border     = ggplot2::element_rect(colour = "black", fill = NA, linewidth = 0.8))
+
+  if (!is.null(panel_letters)) {
+    models_present <- levels(df_long$model)
+    ann_df <- data.frame(
+      model = factor(models_present, levels = model_levels),
+      label = panel_letters[1:length(models_present)],
+      x = -Inf,
+      y = Inf
+    )
+    p <- p + ggplot2::geom_text(data = ann_df, ggplot2::aes(x = x, y = y, label = label),
+                                 hjust = -0.3, vjust = 1.3, fontface = "bold", size = 6,
+                                 inherit.aes = FALSE)
+  } else if (!is.null(panel_letter)) {
+    p <- p + ggplot2::annotate("text", x = -Inf, y = Inf, label = panel_letter,
+                                hjust = -0.3, vjust = 1.3, fontface = "bold", size = 6)
   }
-  
+
   return(p)
 }
 
-make_pred_plot <- function(df, title_str, show_legend = TRUE, linewidth_obs = 0.9,
-                           has_lstm = TRUE) {
+make_pred_plot <- function(df, title_str, show_legend = TRUE, linewidth_obs = 1.1,
+                           has_lstm = TRUE, panel_letter = NULL) {
   p <- ggplot2::ggplot(df, ggplot2::aes(x = time)) +
     ggplot2::geom_line(ggplot2::aes(y = measured, color = "Observed"),
-                       linewidth = linewidth_obs) +
+                       linetype = "dotted", linewidth = linewidth_obs) +
     ggplot2::geom_line(ggplot2::aes(y = base,     color = "NicheMapR"),
-                       linetype = "dashed", linewidth = 0.8)
+                       linetype = "dashed", linewidth = 1.0)
   if (has_lstm && "lstm" %in% names(df))
-    p <- p + ggplot2::geom_line(ggplot2::aes(y = lstm, color = "LSTM Corrected"),
-                                 linewidth = 0.8)
+    p <- p + ggplot2::geom_line(ggplot2::aes(y = lstm, color = "LSTM Correction"),
+                                 linetype = "solid", linewidth = 1.2)
   p <- p +
-    ggplot2::geom_line(ggplot2::aes(y = rf,       color = "RF Corrected"),
-                       linetype = "dotted", linewidth = 0.8) +
+    ggplot2::geom_line(ggplot2::aes(y = rf,       color = "Random Forest Correction"),
+                       linetype = "solid", linewidth = 1.2) +
     ggplot2::scale_color_manual(
-      values = c("Observed"       = "#111111",
-                 "NicheMapR"      = "#ef4444",
-                 "LSTM Corrected" = "#3b82f6",
-                 "RF Corrected"   = "#10b981")) +
-    ggplot2::labs(title = title_str, x = NULL, y = "Temperature (°C)", color = NULL) +
+      values = c("Observed"                 = "#111111",
+                 "NicheMapR"                = "#dc2626",
+                 "Random Forest Correction" = "#059669",
+                 "LSTM Correction"          = "#2563eb"),
+      breaks = c("Observed", "NicheMapR", "Random Forest Correction", "LSTM Correction")) +
+    ggplot2::labs(title = title_str, x = NULL, y = expression("Temperature (" * degree * "C)"), color = NULL) +
     ggplot2::theme_minimal(base_size = 16) +
     ggplot2::theme(
       plot.title       = ggplot2::element_text(face = "bold", hjust = 0.5, size = 18),
       legend.position  = "top",
-      legend.text      = ggplot2::element_text(size = 16),
+      legend.text      = ggplot2::element_text(size = 14),
       axis.title       = ggplot2::element_text(size = 16),
       axis.text        = ggplot2::element_text(size = 14),
-      panel.grid.minor = ggplot2::element_blank())
+      panel.grid.major = ggplot2::element_blank(),
+      panel.grid.minor = ggplot2::element_blank(),
+      panel.border     = ggplot2::element_rect(colour = "black", fill = NA, linewidth = 0.8))
+
+  if (!is.null(panel_letter)) {
+    p <- p + ggplot2::annotate("text", x = -Inf, y = Inf, label = panel_letter,
+                                hjust = -0.3, vjust = 1.3, fontface = "bold", size = 6)
+  }
+  return(p)
 }
 
 # build_pred_df ------------------------------------------------------------------
