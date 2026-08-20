@@ -519,3 +519,21 @@ print_daily_stats <- function(ds, label) {
                 r$me_max_avg,  r$me_max_sd))
   }
 }
+
+# arrange_with_legend ------------------------------------------------------------
+# Combine a list of ggplot panels into a grid with a single common legend.
+# Avoids ggpubr multi-page list returns and works seamlessly with ggsave().
+arrange_with_legend <- function(panels, ncol = 2, nrow = NULL, legend_pos = "bottom") {
+  panels <- unname(panels)
+  first_p <- NULL
+  for (p in panels) {
+    if (!is.null(p)) { first_p <- p; break }
+  }
+  leg <- ggpubr::get_legend(first_p)
+  p_grid <- ggpubr::ggarrange(plotlist = panels, ncol = ncol, nrow = nrow, legend = "none")
+  if (legend_pos == "top") {
+    ggpubr::ggarrange(leg, p_grid, ncol = 1, heights = c(0.08, 1))
+  } else {
+    ggpubr::ggarrange(p_grid, leg, ncol = 1, heights = c(1, 0.08))
+  }
+}
