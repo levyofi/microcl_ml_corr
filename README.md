@@ -1,28 +1,28 @@
-# microclCorr: Correcting Microclimate Model Predictions with Machine Learning
+# microclCorr: Correcting Timeseries Microclimate Model Predictions with Machine Learning
 
 [![R-CMD-check](https://img.shields.io/badge/R--CMD--check-passing-brightgreen.svg)](https://github.com/levyofi/microcl_ml_corr)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-`microclCorr` is an R package that improves the accuracy of microclimate temperature predictions produced by physical models such as **NicheMapR**.
+`microclCorr` is an R package that improves the accuracy of microclimate temperature predictions produced by physical models (such as **NicheMapR**).
 
-Physical models like NicheMapR are fundamental tools for understanding how species interact with their thermal environment. By simulating temperatures from first principles — solar radiation, wind, terrain geometry, and heat transfer — they provide mechanistic insight that purely statistical approaches cannot. However, in microhabitats with complex heat balance conditions not yet fully captured by current physical models — such as coastal beaches, where marine winds and sea surface temperatures create rapidly changing microclimates — a residual gap remains between model predictions and field measurements.
+Physical models are fundamental tools for understanding how species interact with their thermal environment. By simulating temperatures from first principles — solar radiation, wind, terrain geometry, and heat transfer — they provide mechanistic insight that purely statistical approaches cannot. However, in microhabitats with complex heat-balance conditions not yet fully captured by current physical models, or poor parameterizations due to low-resolution input data, a residual gap remains between model predictions and field measurements.
 
-`microclCorr` bridges that gap using machine learning. Rather than modifying or replacing the physical model, it learns to predict and correct the residual error from a small set of temperature logger measurements. This eliminates the need to manually re-parameterise the physical model for each specific microhabitat, reducing prediction errors by **58% to 90%** across Mediterranean, coastal, and desert environments.
+`microclCorr` bridges that gap using machine learning. Rather than modifying or replacing the physical model, it learns to predict and correct the residual error from a small set of temperature logger measurements. This eliminates the need to manually re-parameterise the physical model for each specific microhabitat. The package includes case studies where ML reduced prediction errors by **58% to 90%** across Mediterranean, coastal, and desert environments.
 
 ---
 
 ## How it works
 
-NicheMapR predicts a temperature. A field logger measures the actual temperature. The difference between the two is called the **residual**:
+A physical model predicts a temperature. A field logger measures the actual temperature. The difference between the two is called the **residual**:
 
 ```
-residual = measured temperature − NicheMapR prediction
+residual = measured temperature − physical model prediction
 ```
 
 `microclCorr` trains a model to predict that residual. The corrected temperature is then:
 
 ```
-corrected temperature = NicheMapR prediction + predicted residual
+corrected temperature = physical model prediction + predicted residual
 ```
 
 Two model types are available and compared:
@@ -86,7 +86,7 @@ flowchart TD
 
 **What you need to provide:**
 - A **logger data CSV** — measured temperatures, timestamps, microhabitat label, and environmental variables
-- A **NicheMapR predictions CSV** — model-predicted temperatures for the same location and time period
+- A **physical model predictions CSV** — model-predicted temperatures for the same location and time period
 
 **Your only pre-processing step** (done outside the package):
 1. Join both files by timestamp and add a `residual` column (measured − predicted)
@@ -133,7 +133,7 @@ use_condaenv("your_env_name", required = TRUE)
 
 ## Examples
 
-The package includes eight fully worked scenario scripts in [`inst/examples/`](inst/examples/). These correspond directly to the **4 Examples** presented in the Mazor et al. paper, alongside supplementary scenarios:
+The package includes eight fully worked scenario scripts in [`inst/examples/`](inst/examples/). These correspond directly to the **4 Examples** presented in Mazor et al. (in preparation), alongside supplementary scenarios:
 
 | Scenario / Script | Paper Example | Question answered |
 |----------|---------------|-----------------|
