@@ -1,6 +1,6 @@
 # microclCorr: Correcting Timeseries Microclimate Model Predictions with Machine Learning
 
-[![R-CMD-check](https://img.shields.io/badge/R--CMD--check-passing-brightgreen.svg)](https://github.com/levyofi/microcl_ml_corr)
+[![R-CMD-check](https://img.shields.io/badge/R--CMD--check-passing-brightgreen.svg)](#)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 `microclCorr` is an R package that improves the accuracy of microclimate temperature predictions produced by physical models (such as **NicheMapR**).
@@ -104,7 +104,7 @@ See the [preprocessing examples](inst/examples/preprocessing_examples/) for read
 # Install devtools if you haven't already
 if (!requireNamespace("devtools", quietly = TRUE)) install.packages("devtools")
 
-devtools::install_github("levyofi/microcl_ml_corr")
+devtools::install_github("anonymous/microcl_ml_corr")
 ```
 
 ### 2. Install core dependencies
@@ -133,7 +133,7 @@ use_condaenv("your_env_name", required = TRUE)
 
 ## Examples
 
-The package includes eight fully worked scenario scripts in [`inst/examples/`](inst/examples/). These correspond directly to the **4 Examples** presented in Mazor et al. (in preparation), alongside supplementary scenarios:
+The package includes eight fully worked scenario scripts in [`inst/examples/`](inst/examples/). These correspond directly to the **4 Examples** presented in the accompanying manuscript (in preparation), alongside supplementary scenarios:
 
 | Scenario / Script | Paper Example | Question answered |
 |----------|---------------|-----------------|

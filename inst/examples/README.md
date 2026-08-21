@@ -80,7 +80,7 @@ All input data is bundled with the package and located automatically via
 
 ## Which scenario should I start with?
 
-The scenarios in this folder correspond directly to the **4 Examples** presented in the main text of the Mazor et al. paper:
+The scenarios in this folder correspond directly to the **4 Examples** presented in the main text of the accompanying paper:
 
 | Scenario / Script | Paper Example | What it answers |
 |----------|---------------|----------------|

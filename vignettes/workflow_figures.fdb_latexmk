@@ -1,6 +1,6 @@
 # Fdb version 4
-["pdflatex"] 1782057277.28505 "/Users/ofir/Dropbox/Antigravity/NichMapR_ml_corr/microcl_ml_corr/vignettes/workflow_figures.tex" "workflow_figures.pdf" "workflow_figures" 1782057277.93586 0
-  "/Users/ofir/Dropbox/Antigravity/NichMapR_ml_corr/microcl_ml_corr/vignettes/workflow_figures.tex" 1782057277.00683 14310 fb640cdad4d8519e94782cadb2eee7bd ""
+["pdflatex"] 1782057277.28505 "./vignettes/workflow_figures.tex" "workflow_figures.pdf" "workflow_figures" 1782057277.93586 0
+  "./vignettes/workflow_figures.tex" 1782057277.00683 14310 fb640cdad4d8519e94782cadb2eee7bd ""
   "/usr/local/texlive/2025/texmf-dist/fonts/enc/dvips/cm-super/cm-super-t1.enc" 1136849721 2971 def0b6c1f0b107b3b936def894055589 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/local/texlive/2025/texmf-dist/fonts/tfm/jknappen/ec/ecbx0800.tfm" 1136768653 3584 269b66e921ba58750c12f7f1c8ea3ebd ""
