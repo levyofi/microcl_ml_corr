@@ -48,8 +48,8 @@ across the 7 sites.
 | Model | Daily Min | Daily Max |
 | --- | --- | --- |
 | Baseline | −2.44 ± 1.81 | +12.38 ± 8.26 |
-| RF | −0.01 ± 0.46 | −0.02 ± 0.79 |
-| LSTM | −0.56 ± 1.42 | −0.69 ± 2.32 |
+| RF | −0.01 ± 0.46 | +0.90 ± 0.60 |
+| LSTM | −0.56 ± 1.42 | +2.69 ± 1.54 |
 
 The pooled RF model achieves outstanding daily-max correction (0.90 vs 15.04 °C baseline, 94%
 reduction) with near-zero ME, far better than the single-logger model in Scenario 2.
@@ -86,9 +86,9 @@ as well across the 7 beach sites.
 
 ## 7. Key Takeaway
 
-The pooled RF model (avg 0.875 °C, 89.7% improvement) substantially outperforms the single-logger
-baseline from Scenario 2 (3.06 °C, 62.6%), but has ~10× more training data, so the comparison is
+The pooled RF model (avg 0.734 °C RMSE, 91.5% improvement) substantially outperforms the single-logger
+baseline from Scenario 2 (1.399 °C RMSE, 88.3%), but has ~10× more training data, so the comparison is
 not volume-controlled. Performance is virtually identical to the specialized per-location models
-in Scenario 5 (~0.84 °C avg), confirming that a single pooled model generalizes as well as
+in Scenario 5 (0.733 °C avg), confirming that a single pooled model generalizes as well as
 separate location-specific models. Daily-max RMSE (0.90 °C pooled vs 1.39 °C single-logger)
 shows the pooled model's particular strength at capturing extreme temperature events.

@@ -77,10 +77,10 @@ to capture across the spatially diverse 48-logger dataset. Baseline ME will be n
 
 ## 6. Key Takeaway
 
-The pooled RF model (avg ~1.04 °C, ~87.6% improvement) substantially outperforms the single-logger
-baseline from Scenario 3 (1.884 °C, 73.9%), but uses vastly more training data
+The pooled RF model (avg 1.712 °C RMSE, 79.6% improvement) substantially outperforms the single-logger
+baseline from Scenario 3 (0.746 °C RMSE, 89.8%), but uses vastly more training data
 (118,753 vs ~450–1,570 rows), making the comparison volume-confounded. Performance is virtually
-identical to the specialized per-region models in Scenario 7 (~1.05 °C avg RF), confirming that
+identical to the specialized per-region models in Scenario 7 (1.803 °C avg RF), confirming that
 pooling all 48 desert loggers into one model does not hurt accuracy relative to region-specific
 models. Daily-max RMSE (2.72 °C) is larger than daily-min RMSE (0.93 °C), indicating that extreme
 daytime peaks remain harder to capture across a spatially heterogeneous 48-logger pool.

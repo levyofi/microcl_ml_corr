@@ -17,7 +17,7 @@ across days), for all sites within each beach location.
 | --- | --- | --- | --- | --- | --- | --- |
 | Ashkelon     | 29.92 ± 4.17 | 23.37 ± 2.99 | 39.38 ± 7.39 |
 | Range_24     | 32.12 ± 2.02 | 23.04 ± 2.40 | 46.73 ± 3.09 |
-| Rosh_HaNikra | 32.66 ± 1.87 | 23.88 ± 3.28 | 7958 | 45.85 ± 5.37 |
+| Rosh_HaNikra | 32.66 ± 1.87 | 23.88 ± 3.28 | 45.85 ± 5.37 |
 
 ## 2. Residual Distributions — Before and After Correction (Zero-Shot RF)
 
@@ -58,7 +58,7 @@ across test days**. No LSTM in this scenario (RF only).
 | Range_24 | Baseline | −1.61 ± 1.53 | +8.68 ± 9.49 |
 | Range_24 | RF (zero-shot) | +0.94 ± 1.32 | −1.73 ± 2.39 |
 | Rosh_HaNikra | Baseline | −3.08 ± 2.27 | +12.83 ± 9.83 |
-| Rosh_HaNikra | RF (zero-shot) | −0.88 ± 4.53 | +1.42 ± 4.53 |
+| Rosh_HaNikra | RF (zero-shot) | +1.42 ± 4.53 | +1.42 ± 4.53 |
 
 The zero-shot model substantially reduces daily-max RMSE (e.g. Ashkelon: 20.09 → 5.98 °C) but
 leaves residual errors much larger than the specialized/pooled models (~1.4 °C daily-max).

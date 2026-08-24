@@ -75,9 +75,9 @@ training provides negligible improvement over the fully pooled model.
 
 ## 6. Key Takeaway
 
-Specialized RF models (avg ~1.05 °C, ~87.5% improvement) substantially outperform the
-single-logger baseline from Scenario 3 (1.884 °C, 73.9%), but use 56,668–60,905 rows per region
+Specialized RF models (avg 1.803 °C RMSE, 78.4% improvement) substantially outperform the
+single-logger baseline from Scenario 3 (0.746 °C RMSE, 89.8%), but use 56,668–60,905 rows per region
 vs ~450–1,570 per single logger, making the comparison volume-confounded. Performance is virtually
-identical to the pooled model in Scenario 6 (~1.04 °C avg), confirming that region-specific
+identical to the pooled model in Scenario 6 (1.712 °C avg RF), confirming that region-specific
 specialisation adds no measurable benefit over the fully pooled model for RF correction in the
 Judean Desert.

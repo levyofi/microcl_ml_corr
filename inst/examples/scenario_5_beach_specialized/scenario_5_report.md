@@ -68,8 +68,8 @@ than the pooled model in Scenario 4. Differences will be small and within run-to
 
 ## 6. Key Takeaway
 
-Specialized RF models (avg ~0.84 °C, ~90% improvement) substantially outperform the single-logger
-baseline from Scenario 2 (3.06 °C, 62.6%), but use ~3× more training data per location
+Specialized RF models (avg 0.733 °C RMSE, 91.5% improvement) substantially outperform the single-logger
+baseline from Scenario 2 (1.399 °C RMSE, 88.3%), but use ~3× more training data per location
 (4,464–4,893 rows vs ~1,405 rows), making it a volume-confounded comparison. Performance is
-virtually identical to the pooled model in Scenario 4 (0.875 °C), confirming that location-specific
+virtually identical to the pooled model in Scenario 4 (0.734 °C RMSE), confirming that location-specific
 pooling captures most of the benefit of the full pooled model while using only a third of the data.
