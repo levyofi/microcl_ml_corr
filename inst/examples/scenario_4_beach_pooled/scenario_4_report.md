@@ -30,26 +30,26 @@ correction the distribution collapses to near zero at every site.
 
 ![Beach pooled prediction examples](prediction_examples_beach_pooled.png)
 
-## 4. Daily Min / Mean / Max Errors (Test Set, averaged across 7 sites)
+## 4. Daily Min / Max Errors (Test Set, averaged across 7 sites)
 
 Two tables, one per error metric. Each cell is **average ± SD across test days**, then averaged
 across the 7 sites.
 
 **RMSE (°C) — avg ± SD across days**
 
-| Model | Daily Min | Daily Mean | Daily Max |
-| --- | --- | --- | --- |
-| Baseline | 3.04 ± 1.67 | 4.24 ± 1.76 | 15.04 ± 5.79 |
-| RF | 0.50 ± 0.34 | 0.31 ± 0.20 | 0.90 ± 0.60 |
-| LSTM | 4.32 ± 2.57 | 3.15 ± 1.49 | 5.22 ± 2.93 |
+| Model | Daily Min | Daily Max |
+| --- | --- | --- |
+| Baseline | 3.04 ± 1.67 | 15.04 ± 5.79 |
+| RF | 0.50 ± 0.34 | 0.90 ± 0.60 |
+| LSTM | 1.57 ± 0.88 | 2.69 ± 1.54 |
 
 **ME (°C) — avg ± SD across days** (positive = over-prediction, negative = under-prediction)
 
-| Model | Daily Min | Daily Mean | Daily Max |
-| --- | --- | --- | --- |
-| Baseline | −2.44 ± 1.81 | +1.45 ± 3.88 | +12.38 ± 8.26 |
-| RF | −0.01 ± 0.46 | −0.06 ± 0.29 | −0.02 ± 0.79 |
-| LSTM | −1.87 ± 3.74 | −0.87 ± 2.68 | −0.66 ± 4.56 |
+| Model | Daily Min | Daily Max |
+| --- | --- | --- |
+| Baseline | −2.44 ± 1.81 | +12.38 ± 8.26 |
+| RF | −0.01 ± 0.46 | −0.02 ± 0.79 |
+| LSTM | −0.56 ± 1.42 | −0.69 ± 2.32 |
 
 The pooled RF model achieves outstanding daily-max correction (0.90 vs 15.04 °C baseline, 94%
 reduction) with near-zero ME, far better than the single-logger model in Scenario 2.
@@ -58,29 +58,31 @@ as well across the 7 beach sites.
 
 ## 5. Aggregated Hourly Summary
 
-| Model | Avg Base RMSE (°C) | Avg Corrected RMSE (°C) | Avg Improvement (%) |
+
+| Model | Avg Base RMSE (°C) | Avg Corrected Test RMSE (°C) | Avg Test Improvement (%) |
 | --- | --- | --- | --- |
-| RF | 8.544 | 0.875 | 89.7% |
-| LSTM_2h | 8.544 | 2.092 | 74.5% |
+| RF |  8.544 |  0.733 | 91.5% |
+| LSTM_2h |  8.544 |  2.134 | 74.0% |
 
 ## 6. Per-Site Results
 
-| Site | Model | Base RMSE (°C) | Corrected RMSE (°C) | Improvement (%) |
+
+| Site | Model | Base Test RMSE (°C) | Corrected Test RMSE (°C) | Test Improvement (%) |
 | --- | --- | --- | --- | --- |
-| Ashkelon 10 m | RF | 10.684 | 1.232 | 88.5% |
-| Ashkelon 10 m | LSTM_2h | 10.684 | 1.479 | 86.2% |
-| Ashkelon 15 m | RF | 9.930 | 0.758 | 92.4% |
-| Ashkelon 15 m | LSTM_2h | 9.930 | 1.625 | 83.6% |
-| Range_24 25 m | RF | 7.602 | 0.669 | 91.2% |
-| Range_24 25 m | LSTM_2h | 7.602 | 1.609 | 78.8% |
-| Range_24 45 m | RF | 7.610 | 0.660 | 91.3% |
-| Range_24 45 m | LSTM_2h | 7.610 | 1.450 | 81.0% |
-| Rosh_HaNikra 15 m | RF | 6.810 | 0.963 | 85.9% |
-| Rosh_HaNikra 15 m | LSTM_2h | 6.810 | 2.802 | 58.9% |
-| Rosh_HaNikra 25 m | RF | 9.841 | 1.150 | 88.3% |
-| Rosh_HaNikra 25 m | LSTM_2h | 9.841 | 3.040 | 69.1% |
-| Rosh_HaNikra 45 m | RF | 7.334 | 0.695 | 90.5% |
-| Rosh_HaNikra 45 m | LSTM_2h | 7.334 | 2.637 | 64.0% |
+| Range_24 25 m | RF |  7.602 |  0.505 | 93.4% |
+| Range_24 25 m | LSTM_2h |  7.602 |  1.622 | 78.7% |
+| Range_24 45 m | RF |  7.610 |  0.461 | 93.9% |
+| Range_24 45 m | LSTM_2h |  7.610 |  1.479 | 80.6% |
+| Rosh_HaNikra 15 m | RF |  6.810 |  0.765 | 88.8% |
+| Rosh_HaNikra 15 m | LSTM_2h |  6.810 |  2.852 | 58.1% |
+| Rosh_HaNikra 25 m | RF |  9.841 |  1.041 | 89.4% |
+| Rosh_HaNikra 25 m | LSTM_2h |  9.841 |  3.111 | 68.4% |
+| Ashkelon 10 m | RF | 10.684 |  1.112 | 89.6% |
+| Ashkelon 10 m | LSTM_2h | 10.684 |  1.472 | 86.2% |
+| Ashkelon 15 m | RF |  9.930 |  0.638 | 93.6% |
+| Ashkelon 15 m | LSTM_2h |  9.930 |  1.640 | 83.5% |
+| Rosh_HaNikra 45 m | RF |  7.334 |  0.609 | 91.7% |
+| Rosh_HaNikra 45 m | LSTM_2h |  7.334 |  2.759 | 62.4% |
 
 ## 7. Key Takeaway
 

@@ -49,45 +49,46 @@ offset that both models eliminate effectively.
 
 ![Desert predictions example](prediction_examples_desert.png)
 
-## 5. Daily Min / Mean / Max Errors (Test Set)
+## 5. Daily Min / Max Errors (Test Set)
 
 Two tables, one per error metric. Each cell is **average ± SD across test days**.
 Models were trained and evaluated on **Small** objects only.
 
 **RMSE (°C) — avg ± SD across days**
 
-| Microhabitat | Size | Model | Daily Min | Daily Mean | Daily Max |
-| --- | --- | --- | --- | --- | --- |
-| Bush | Small | Baseline | 5.06 ± 1.96 | 6.16 ± 2.01 | 8.33 ± 2.14 |
-| Bush | Small | RF | 1.51 ± 0.94 | 1.83 ± 1.25 | 2.72 ± 1.95 |
-| Bush | Small | LSTM | 1.44 ± 0.67 | 1.34 ± 0.63 | 1.30 ± 0.89 |
-| Rock | Small | Baseline | 5.40 ± 0.99 | 6.45 ± 1.40 | 8.49 ± 2.43 |
-| Rock | Small | RF | 0.88 ± 0.55 | 1.06 ± 0.77 | 1.71 ± 1.26 |
-| Rock | Small | LSTM | 2.38 ± 0.95 | 1.79 ± 0.64 | 2.27 ± 1.41 |
+| Microhabitat | Size | Model | Daily Min | Daily Max |
+| --- | --- | --- | --- | --- |
+| Bush | Small | Baseline | 4.17 ± 1.01 | 11.64 ± 3.87 |
+| Bush | Small | RF | 0.89 ± 0.62 | 1.96 ± 0.72 |
+| Bush | Small | LSTM | 0.97 ± 0.58 | 4.07 ± 2.05 |
+| Rock | Small | Baseline | 5.90 ± 1.51 | 10.70 ± 0.98 |
+| Rock | Small | RF | 0.30 ± 0.24 | 0.31 ± 0.23 |
+| Rock | Small | LSTM | 1.62 ± 1.44 | 2.86 ± 0.94 |
 
 **ME (°C) — avg ± SD across days** (positive = over-prediction, negative = under-prediction)
 
-| Microhabitat | Size | Model | Daily Min | Daily Mean | Daily Max |
-| --- | --- | --- | --- | --- | --- |
-| Bush | Small | Baseline | −4.72 ± 1.96 | −5.88 ± 2.01 | −8.10 ± 2.14 |
-| Bush | Small | RF | +0.96 ± 1.25 | +1.13 ± 1.56 | +1.62 ± 2.36 |
-| Bush | Small | LSTM | +0.36 ± 1.51 | +0.33 ± 1.40 | +0.42 ± 1.33 |
-| Rock | Small | Baseline | −5.32 ± 0.99 | −6.31 ± 1.40 | −8.19 ± 2.43 |
-| Rock | Small | RF | +0.30 ± 0.90 | +0.75 ± 0.81 | +1.03 ± 1.48 |
-| Rock | Small | LSTM | −2.21 ± 0.95 | −1.68 ± 0.64 | −1.57 ± 1.77 |
+| Microhabitat | Size | Model | Daily Min | Daily Max |
+| --- | --- | --- | --- | --- |
+| Bush | Small | Baseline | −4.07 ± 1.01 | −11.08 ± 3.87 |
+| Bush | Small | RF | +0.68 ± 0.62 | −1.08 ± 1.77 |
+| Bush | Small | LSTM | +0.43 ± 0.93 | −1.74 ± 3.98 |
+| Rock | Small | Baseline | −5.73 ± 1.51 | −10.66 ± 0.98 |
+| Rock | Small | RF | −0.03 ± 0.32 | −0.11 ± 0.32 |
+| Rock | Small | LSTM | −0.38 ± 1.70 | −2.72 ± 0.94 |
 
 The baseline ME is strongly negative for both microhabitats (~−6 °C), confirming NicheMapR's
 consistent cold bias. RF eliminates the bias for Rock (ME ~+0.75 °C) but slightly over-corrects.
 For Bush, LSTM achieves a near-zero ME (+0.33 °C) and lower RMSE than RF, while RF over-corrects
 more (+1.13 °C). Both models reduce daily extremes RMSE by ~68–83%.
 
-## 6. Performance at Full Training Data
+## 6. Performance on Held-Out Test Data (Full Training Set)
 
-| Microhabitat | Baseline NicheMapR RMSE (°C) | RF RMSE (°C) | RF Imp (%) | LSTM (2h) RMSE (°C) | LSTM (2h) Imp (%) |
+
+| Microhabitat | Baseline NicheMapR RMSE (°C) | RF Test RMSE (°C) | RF Imp (%) | LSTM (2h) Test RMSE (°C) | LSTM (2h) Imp (%) |
 | --- | --- | --- | --- | --- | --- |
-| Rock  | 6.536 | 1.657 | 74.6% | 2.178 | 66.7% |
-| Bush  | 6.344 | 2.090 | 67.1% | 1.591 | 74.9% |
-| **Average** | **6.440** | **1.873** | **70.9%** | **1.885** | **70.8%** |
+| Rock  |  7.941 |  0.286 | 96.4% |  2.124 | 73.3% |
+| Bush  |  7.162 |  1.207 | 83.1% |  2.447 | 65.8% |
+| **Average** | ** 7.551** | ** 0.746** | **89.8%** | ** 2.285** | **69.5%** |
 
 ## 7. Key Takeaway
 

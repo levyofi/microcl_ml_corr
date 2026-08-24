@@ -1,3 +1,4 @@
-"logger","stat","base_rmse","rf_rmse","lstm_rmse","base_mean","obs_mean"
-"Beach - Ashkelon 15 m","Daily Min",1.56553782159637,0.527503348484005,0.929401019480566,23.7492962555913,25.2142857142857
-"Beach - Ashkelon 15 m","Daily Max",20.8436273386331,1.39013802605699,1.21557992736496,68.6536646018905,47.8714285714286
+"model","rmse_mean_avg","rmse_mean_sd","rmse_min_avg","rmse_min_sd","rmse_max_avg","rmse_max_sd","me_mean_avg","me_mean_sd","me_min_avg","me_min_sd","me_max_avg","me_max_sd","logger"
+"base",6.08,0.82,1.57,0.6,20.84,1.73,6.03,0.82,-1.46,0.6,20.78,1.73,"Ashkelon_15_m"
+"rf",0.56,0.28,0.53,0.29,1.39,0.56,0.28,0.52,0.06,0.57,-1.05,0.99,"Ashkelon_15_m"
+"lstm",0.74,0.31,0.49,0.27,0.99,0.58,0.68,0.31,0.09,0.52,-0.05,1.07,"Ashkelon_15_m"

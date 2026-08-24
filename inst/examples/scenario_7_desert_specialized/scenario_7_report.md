@@ -28,7 +28,7 @@ region-specific RF model, each site's distribution collapses to near zero.
 
 ![Desert specialized prediction examples](prediction_examples_desert_specialized.png)
 
-## 4. Daily Min / Mean / Max Errors (Test Set, averaged across 48 sites)
+## 4. Daily Min / Max Errors (Test Set, averaged across 48 sites)
 
 Two tables, one per error metric. Each cell is **average ± SD across test days**, then averaged
 across the 48 sites. RF and LSTM.
@@ -36,35 +36,42 @@ Re-run `generate_plots.R` to populate exact values.
 
 **RMSE (°C) — avg ± SD across days**
 
-| Model | Daily Min | Daily Mean | Daily Max |
-| --- | --- | --- | --- |
-| Baseline | 7.46 ± 1.57 | 7.89 ± 1.43 | 8.65 ± 1.79 |
-| RF | 1.20 ± 0.69 | 1.00 ± 0.64 | 1.39 ± 0.89 |
-| LSTM | 1.47 ± 0.80 | 1.09 ± 0.64 | 1.75 ± 1.16 |
+| Model | Daily Min | Daily Max |
+| --- | --- | --- |
+| Baseline | 7.52 ± 1.45 | 9.58 ± 3.17 |
+| RF | 1.02 ± 0.59 | 2.77 ± 1.15 |
+| LSTM | 1.18 ± 0.66 | 2.96 ± 1.33 |
 
 **ME (°C) — avg ± SD across days**
 
-| Model | Daily Min | Daily Mean | Daily Max |
-| --- | --- | --- | --- |
-| Baseline | -7.30 ± 1.57 | -7.76 ± 1.43 | -8.46 ± 1.79 |
-| RF | -0.42 ± 0.97 | -0.36 ± 0.89 | -0.06 ± 1.33 |
-| LSTM | -0.82 ± 1.12 | -0.55 ± 0.94 | 0.03 ± 1.65 |
+| Model | Daily Min | Daily Max |
+| --- | --- | --- |
+| Baseline | −7.39 ± 1.45 | −8.84 ± 3.20 |
+| RF | −0.05 ± 0.80 | −1.01 ± 1.38 |
+| LSTM | −0.36 ± 0.90 | −1.00 ± 1.64 |
 
 Expected to be nearly identical to the pooled model (Scenario 6), confirming that region-specific
 training provides negligible improvement over the fully pooled model.
 
 ## 5. Per-Region & Microhabitat Summary
 
-| Location | Microhabitat | Model | Avg Base RMSE (°C) | Avg Corrected RMSE (°C) | Avg Improvement (%) |
+
+| Location | Microhabitat | Model | Avg Base RMSE (°C) | Avg Corrected Test RMSE (°C) | Avg Test Improvement (%) |
 | --- | --- | --- | --- | --- | --- |
-| Mishmar | Bush | RF | 8.793 | 1.068 | 87.8% |
-| Mishmar | Bush | LSTM_2h | 8.793 | 1.448 | 83.5% |
-| Mishmar | Rock | RF | 8.764 | 0.927 | 89.5% |
-| Mishmar | Rock | LSTM_2h | 8.764 | 1.324 | 85.0% |
-| Tzeelim | Bush | RF | 8.290 | 1.351 | 83.7% |
-| Tzeelim | Bush | LSTM_2h | 8.290 | 1.680 | 79.8% |
-| Tzeelim | Rock | RF | 7.733 | 0.840 | 89.0% |
-| Tzeelim | Rock | LSTM_2h | 7.733 | 1.155 | 84.9% |
+| **Overall (n=48)** | **All** | **RF** | ** 8.395** | ** 1.803** | **78.4%** |
+| **Overall (n=48)** | **All** | **LSTM_2h** | ** 8.395** | ** 1.962** | **76.7%** |
+| **Mishmar (n=24)** | **All** | **RF** | ** 8.778** | ** 1.443** | **83.6%** |
+| **Mishmar (n=24)** | **All** | **LSTM_2h** | ** 8.778** | ** 1.796** | **79.6%** |
+| Mishmar | Bush | RF |  8.793 |  1.389 | 84.3% |
+| Mishmar | Bush | LSTM_2h |  8.793 |  1.780 | 79.9% |
+| Mishmar | Rock | RF |  8.764 |  1.497 | 82.8% |
+| Mishmar | Rock | LSTM_2h |  8.764 |  1.811 | 79.4% |
+| **Tzeelim (n=24)** | **All** | **RF** | ** 8.012** | ** 2.163** | **73.3%** |
+| **Tzeelim (n=24)** | **All** | **LSTM_2h** | ** 8.012** | ** 2.127** | **73.7%** |
+| Tzeelim | Bush | RF |  8.290 |  2.170 | 74.6% |
+| Tzeelim | Bush | LSTM_2h |  8.290 |  2.032 | 76.1% |
+| Tzeelim | Rock | RF |  7.733 |  2.156 | 72.0% |
+| Tzeelim | Rock | LSTM_2h |  7.733 |  2.223 | 71.2% |
 
 ## 6. Key Takeaway
 

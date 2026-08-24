@@ -46,7 +46,7 @@ before correction (mean ≈ +0.9 °C); both models tighten the spread further.
 
 ![Valley predictions example](prediction_examples_valley.png)
 
-## 5. Daily Min / Mean / Max Errors (Test Set)
+## 5. Daily Min / Max Errors (Test Set)
 
 Two tables, one per error metric. Each cell is **average ± SD across test days**.
 RMSE measures magnitude; ME (signed) reveals directional bias — positive = model over-predicts,
@@ -54,46 +54,47 @@ negative = model under-predicts. Re-run `run_scenario_1.R` to populate exact val
 
 **RMSE (°C) — avg ± SD across days**
 
-| Microhabitat | Model | Daily Min | Daily Mean | Daily Max |
-| --- | --- | --- | --- | --- |
-| Air | Baseline | 0.71 ± 0.19 | 1.32 ± 0.47 | 3.43 ± 1.10 |
-| Air | RF | 0.27 ± 0.18 | 0.09 ± 0.06 | 0.58 ± 0.38 |
-| Air | LSTM | 0.41 ± 0.24 | 0.21 ± 0.12 | 0.86 ± 0.58 |
-| Shade | Baseline | 6.25 ± 1.09 | 9.69 ± 1.39 | 19.35 ± 3.34 |
-| Shade | RF | 0.37 ± 0.19 | 0.47 ± 0.22 | 2.77 ± 1.40 |
-| Shade | LSTM | 0.74 ± 0.43 | 0.39 ± 0.31 | 2.71 ± 1.01 |
-| Sun | Baseline | 4.58 ± 1.97 | 6.89 ± 3.62 | 14.59 ± 7.84 |
-| Sun | RF | 0.55 ± 0.39 | 0.53 ± 0.42 | 1.63 ± 0.95 |
-| Sun | LSTM | 2.31 ± 1.44 | 0.81 ± 0.50 | 4.02 ± 2.61 |
+| Microhabitat | Model | Daily Min | Daily Max |
+| --- | --- | --- | --- |
+| Air | Baseline | 0.71 ± 0.19 | 3.43 ± 1.10 |
+| Air | RF | 0.60 ± 0.40 | 1.72 ± 1.37 |
+| Air | LSTM | 0.55 ± 0.29 | 1.53 ± 1.10 |
+| Shade | Baseline | 6.25 ± 1.09 | 19.35 ± 3.34 |
+| Shade | RF | 1.08 ± 0.55 | 4.42 ± 2.17 |
+| Shade | LSTM | 0.81 ± 0.46 | 4.83 ± 2.09 |
+| Sun | Baseline | 4.58 ± 1.97 | 14.59 ± 7.84 |
+| Sun | RF | 1.56 ± 0.81 | 1.97 ± 1.39 |
+| Sun | LSTM | 1.38 ± 0.80 | 3.02 ± 1.93 |
 
 **ME (°C) — avg ± SD across days** (positive = model over-predicts, negative = under-predicts)
 
-| Microhabitat | Model | Daily Min | Daily Mean | Daily Max |
-| --- | --- | --- | --- | --- |
-| Air | Baseline | −0.28 ± 0.70 | −1.25 ± 0.47 | −3.27 ± 1.10 |
-| Air | RF | +0.13 ± 0.26 | −0.02 ± 0.10 | −0.46 ± 0.38 |
-| Air | LSTM | +0.02 ± 0.44 | −0.03 ± 0.22 | −0.35 ± 0.85 |
-| Shade | Baseline | −6.17 ± 1.09 | −9.60 ± 1.39 | −19.10 ± 3.34 |
-| Shade | RF | −0.18 ± 0.35 | −0.43 ± 0.22 | −2.28 ± 1.71 |
-| Shade | LSTM | +0.20 ± 0.76 | −0.26 ± 0.31 | −2.19 ± 1.73 |
-| Sun | Baseline | −4.20 ± 1.97 | −6.02 ± 3.62 | −5.11 ± 14.76 |
-| Sun | RF | +0.24 ± 0.54 | −0.34 ± 0.44 | −0.67 ± 1.60 |
-| Sun | LSTM | −1.68 ± 1.71 | +0.25 ± 0.83 | +0.94 ± 4.22 |
+| Microhabitat | Model | Daily Min | Daily Max |
+| --- | --- | --- | --- |
+| Air | Baseline | −0.28 ± 0.70 | −3.27 ± 1.10 |
+| Air | RF | −0.14 ± 0.63 | −1.14 ± 1.39 |
+| Air | LSTM | −0.06 ± 0.59 | −0.99 ± 1.26 |
+| Shade | Baseline | −6.17 ± 1.09 | −19.10 ± 3.34 |
+| Shade | RF | −0.96 ± 0.55 | −3.42 ± 3.02 |
+| Shade | LSTM | −0.55 ± 0.64 | −4.42 ± 2.09 |
+| Sun | Baseline | −4.20 ± 1.97 | −5.11 ± 14.76 |
+| Sun | RF | +0.51 ± 1.59 | −0.81 ± 1.94 |
+| Sun | LSTM | +0.16 ± 1.48 | −0.80 ± 3.15 |
 
 The baseline ME is strongly negative for all microhabitats (NicheMapR under-predicts).
-Both models nearly eliminate this bias — RF and LSTM daily mean ME is within ±0.5 °C for
+Both models nearly eliminate this bias — RF and LSTM daily min ME is within ±0.5 °C for
 Sun, Shade, and Air. RF achieves particularly low RMSE for daily mean temperatures
 (0.09 °C for Air, 0.47 °C for Shade). The large baseline daily-max SD for Sun (±14.76 °C)
 reflects NicheMapR's highly variable performance on extreme daytime peaks.
 
-## 6. Performance at Full Training Data
+## 6. Performance on Held-Out Test Data (Full Training Set)
 
-| Microhabitat | Baseline NicheMapR RMSE (°C) | RF RMSE (°C) | RF Imp (%) | LSTM (2h) RMSE (°C) | LSTM (2h) Imp (%) |
+
+| Microhabitat | Baseline NicheMapR RMSE (°C) | RF Test RMSE (°C) | RF Imp (%) | LSTM (2h) Test RMSE (°C) | LSTM (2h) Imp (%) |
 | --- | --- | --- | --- | --- | --- |
-| Sun   |  9.140 | 3.855 | 57.8% | 3.461 | 62.1% |
-| Shade | 10.538 | 2.055 | 80.5% | 1.868 | 82.3% |
-| Air   |  2.076 | 1.177 | 43.3% | 1.256 | 39.5% |
-| **Average** | **7.251** | **2.362** | **60.5%** | **2.195** | **61.3%** |
+| Sun   |  9.140 |  3.855 | 57.8% |  3.442 | 62.3% |
+| Shade | 10.538 |  2.055 | 80.5% |  1.813 | 82.8% |
+| Air   |  2.076 |  1.177 | 43.3% |  1.207 | 41.9% |
+| **Average** | ** 7.251** | ** 2.362** | **60.5%** | ** 2.154** | **62.3%** |
 
 ## 7. Sensitivity to Test Block Selection
 

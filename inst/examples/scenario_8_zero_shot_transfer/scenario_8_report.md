@@ -33,32 +33,32 @@ vs ~0.6–1.1 °C for local models).
 
 ![Zero-shot prediction examples](prediction_examples_zero_shot.png)
 
-## 4. Daily Min / Mean / Max Errors — Zero-Shot Strategy (Test Set)
+## 4. Daily Min / Max Errors — Zero-Shot Strategy (Test Set)
 
 Two tables for strategy A (zero-shot, trained on other 2 locations). Each cell is **average ± SD
 across test days**. No LSTM in this scenario (RF only).
 
 **RMSE (°C) — avg ± SD across days**
 
-| Location | Model | Daily Min | Daily Mean | Daily Max |
-| --- | --- | --- | --- | --- | --- | --- |
-| Ashkelon | Baseline | 2.83 ± 1.34 | 7479 | 4.49 ± 1.81 | 20.09 ± 8.45 |
-| Ashkelon | RF (zero-shot) | 1.57 ± 0.99 | 7479 | 1.68 ± 0.86 | 5.98 ± 3.18 |
-| Range_24 | Baseline | 2.20 ± 1.34 | 7248 | 4.03 ± 1.58 | 12.75 ± 4.69 |
-| Range_24 | RF (zero-shot) | 1.61 ± 0.95 | 7248 | 0.90 ± 0.51 | 2.92 ± 1.49 |
-| Rosh_HaNikra | Baseline | 3.81 ± 1.95 | 7958 | 3.92 ± 1.73 | 16.09 ± 6.92 |
-| Rosh_HaNikra | RF (zero-shot) | 2.29 ± 0.97 | 7958 | 1.39 ± 0.88 | 4.69 ± 2.49 |
+| Location | Model | Daily Min | Daily Max |
+| --- | --- | --- | --- |
+| Ashkelon | Baseline | 2.83 ± 1.34 | 20.09 ± 8.45 |
+| Ashkelon | RF (zero-shot) | 1.57 ± 0.99 | 5.98 ± 3.18 |
+| Range_24 | Baseline | 2.20 ± 1.34 | 12.75 ± 4.69 |
+| Range_24 | RF (zero-shot) | 1.61 ± 0.95 | 2.92 ± 1.49 |
+| Rosh_HaNikra | Baseline | 3.81 ± 1.95 | 16.09 ± 6.92 |
+| Rosh_HaNikra | RF (zero-shot) | 2.29 ± 0.97 | 4.69 ± 2.49 |
 
 **ME (°C) — avg ± SD across days** (positive = over-prediction, negative = under-prediction)
 
-| Location | Model | Daily Min | Daily Mean | Daily Max |
-| --- | --- | --- | --- | --- | --- | --- |
-| Ashkelon | Baseline | −2.47 ± 1.40 | 7479 | +2.94 ± 3.43 | +18.19 ± 8.63 |
-| Ashkelon | RF (zero-shot) | −0.46 ± 1.52 | 7479 | +1.18 ± 1.22 | +4.84 ± 3.55 |
-| Range_24 | Baseline | −1.61 ± 1.53 | 7248 | +1.25 ± 3.90 | +8.68 ± 9.49 |
-| Range_24 | RF (zero-shot) | +0.94 ± 1.32 | 7248 | +0.53 ± 0.74 | −1.73 ± 2.39 |
-| Rosh_HaNikra | Baseline | −3.08 ± 2.27 | 7958 | +0.98 ± 3.84 | +12.83 ± 9.83 |
-| Rosh_HaNikra | RF (zero-shot) | −0.88 ± 2.14 | 7958 | −0.90 ± 1.07 | +1.42 ± 4.53 |
+| Location | Model | Daily Min | Daily Max |
+| --- | --- | --- | --- |
+| Ashkelon | Baseline | −2.47 ± 1.40 | +18.19 ± 8.63 |
+| Ashkelon | RF (zero-shot) | −0.46 ± 1.52 | +4.84 ± 3.55 |
+| Range_24 | Baseline | −1.61 ± 1.53 | +8.68 ± 9.49 |
+| Range_24 | RF (zero-shot) | +0.94 ± 1.32 | −1.73 ± 2.39 |
+| Rosh_HaNikra | Baseline | −3.08 ± 2.27 | +12.83 ± 9.83 |
+| Rosh_HaNikra | RF (zero-shot) | −0.88 ± 4.53 | +1.42 ± 4.53 |
 
 The zero-shot model substantially reduces daily-max RMSE (e.g. Ashkelon: 20.09 → 5.98 °C) but
 leaves residual errors much larger than the specialized/pooled models (~1.4 °C daily-max).
@@ -73,20 +73,12 @@ For each Beach location, we:
 4. **Pooled (Downsampled to N)**: Train on a random sample of the pooled data matching the local dataset size. This controls for the effect of training set volume.
 
 ## 6. Results
-| Target Location | Training Strategy | Train Size | Test Size | Corrected RMSE (°C) | Raw NicheMapR (°C) | Improvement (%) |
+| Target Location | Training Strategy | Train Size | Test Size | Baseline NicheMapR RMSE (°C) | Corrected Test RMSE (°C) | Test Improvement (%) |
 | --- | --- | --- | --- | --- | --- | --- |
-| Ashkelon | Zero-Shot (Nearby Sites) | 9357 | 7479 | 3.284 | 10.403 | 68.4% |
-| Ashkelon | Specialized (Local Data) | 4631 | 7479 | 1.089 | 10.403 | 89.5% |
-| Ashkelon | Pooled (All Sites) | 13988 | 7479 | 1.088 | 10.403 | 89.5% |
-| Ashkelon | Pooled (Downsampled to N) | 4631 | 7479 | 1.721 | 10.403 | 83.5% |
-| Range_24 | Zero-Shot (Nearby Sites) | 9524 | 7248 | 2.488 | 7.585 | 67.2% |
-| Range_24 | Specialized (Local Data) | 4464 | 7248 | 0.605 | 7.585 | 92.0% |
-| Range_24 | Pooled (All Sites) | 13988 | 7248 | 0.664 | 7.585 | 91.2% |
-| Range_24 | Pooled (Downsampled to N) | 4464 | 7248 | 1.459 | 7.585 | 80.8% |
-| Rosh_HaNikra | Zero-Shot (Nearby Sites) | 9095 | 7958 | 3.615 | 8.552 | 57.7% |
-| Rosh_HaNikra | Specialized (Local Data) | 4893 | 7958 | 1.017 | 8.552 | 88.1% |
-| Rosh_HaNikra | Pooled (All Sites) | 13988 | 7958 | 1.035 | 8.552 | 87.9% |
-| Rosh_HaNikra | Pooled (Downsampled to N) | 4893 | 7958 | 2.303 | 8.552 | 73.1% |
+| **Overall Average (n=3)** | **Zero-Shot (Nearby Sites)** | **9,325** | **7,562** | **  8.85 ± 1.43** | **  3.20 ± 0.69** | **63.7% ±  6.6%** |
+| Ashkelon | Zero-Shot (Nearby Sites) | 9,357 | 7,479 | 10.403 |  3.427 | 67.1% |
+| Range_24 | Zero-Shot (Nearby Sites) | 9,524 | 7,248 |  7.585 |  2.429 | 68.0% |
+| Rosh_HaNikra | Zero-Shot (Nearby Sites) | 9,095 | 7,958 |  8.552 |  3.749 | 56.2% |
 
 ## 7. Visual Summary — All Strategies
 ![Zero-Shot Transfer Comparison](zero_shot_transfer.png)

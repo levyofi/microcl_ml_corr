@@ -29,7 +29,7 @@ near zero, tightly centred with minimal spread.
 
 ![Beach specialized prediction examples](prediction_examples_beach_specialized.png)
 
-## 4. Daily Min / Mean / Max Errors (Test Set, averaged across 7 sites)
+## 4. Daily Min / Max Errors (Test Set, averaged across 7 sites)
 
 Two tables, one per error metric. Each cell is **average ± SD across test days**, then averaged
 across the 7 sites. RF and LSTM.
@@ -37,33 +37,34 @@ Re-run `generate_plots.R` to populate exact values.
 
 **RMSE (°C) — avg ± SD across days**
 
-| Model | Daily Min | Daily Mean | Daily Max |
-| --- | --- | --- | --- |
-| Baseline | 3.04 ± 1.67 | 4.24 ± 1.76 | 15.04 ± 5.79 |
-| RF | 0.43 ± 0.29 | 0.38 ± 0.28 | 1.06 ± 0.73 |
-| LSTM | 1.67 ± 0.96 | 1.07 ± 0.59 | 2.77 ± 1.68 |
+| Model | Daily Min | Daily Max |
+| --- | --- | --- |
+| Baseline | 3.04 ± 1.67 | 15.04 ± 5.79 |
+| RF | 0.43 ± 0.29 | 1.06 ± 0.73 |
+| LSTM | 1.67 ± 0.96 | 2.77 ± 1.68 |
 
 **ME (°C) — avg ± SD across days**
 
-| Model | Daily Min | Daily Mean | Daily Max |
-| --- | --- | --- | --- |
-| Baseline | -2.44 ± 1.81 | 1.45 ± 3.88 | 12.38 ± 8.26 |
-| RF | 0.01 ± 0.40 | -0.07 ± 0.36 | -0.18 ± 0.92 |
-| LSTM | -1.08 ± 1.26 | -0.71 ± 0.74 | -0.14 ± 2.59 |
+| Model | Daily Min | Daily Max |
+| --- | --- | --- |
+| Baseline | −2.44 ± 1.81 | +12.38 ± 8.26 |
+| RF | +0.01 ± 0.40 | −0.18 ± 0.92 |
+| LSTM | −1.08 ± 1.26 | −0.14 ± 2.59 |
 
 Specialized models are expected to achieve similar or slightly better daily extremes correction
 than the pooled model in Scenario 4. Differences will be small and within run-to-run variability.
 
 ## 5. Per-Location Summary
 
-| Location | Model | Avg Base RMSE (°C) | Avg Corrected RMSE (°C) | Avg Improvement (%) |
+
+| Location | Model | Avg Base RMSE (°C) | Avg Corrected Test RMSE (°C) | Avg Test Improvement (%) |
 | --- | --- | --- | --- | --- |
-| Ashkelon | RF | 10.307 | 0.981 | 90.6% |
-| Ashkelon | LSTM_2h | 10.307 | 1.581 | 84.7% |
-| Range_24 | RF | 7.606 | 0.602 | 92.1% |
-| Range_24 | LSTM_2h | 7.606 | 1.283 | 83.1% |
-| Rosh_HaNikra | RF | 7.995 | 0.931 | 88.3% |
-| Rosh_HaNikra | LSTM_2h | 7.995 | 2.748 | 64.5% |
+| Ashkelon | RF | 10.307 |  0.830 | 92.1% |
+| Ashkelon | LSTM_2h | 10.307 |  1.641 | 84.1% |
+| Range_24 | RF |  7.606 |  0.382 | 95.0% |
+| Range_24 | LSTM_2h |  7.606 |  1.336 | 82.4% |
+| Rosh_HaNikra | RF |  7.995 |  0.884 | 88.9% |
+| Rosh_HaNikra | LSTM_2h |  7.995 |  2.693 | 65.2% |
 
 ## 6. Key Takeaway
 
