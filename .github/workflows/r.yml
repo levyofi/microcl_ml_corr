@@ -19,10 +19,11 @@ permissions:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-13
     strategy:
+      fail-fast: false
       matrix:
-        r-version: ['3.6.3', '4.1.1']
+        r-version: ['3.6.3', '4.0.5', '4.2.0', 'release']
 
     steps:
       - uses: actions/checkout@v4
