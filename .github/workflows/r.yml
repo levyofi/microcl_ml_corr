@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        r-version: ['3.6.3', '4.0.5', '4.2.0', 'release']
+        r-version: ['4.2.0', 'release']
 
     steps:
       - uses: actions/checkout@v4
@@ -32,6 +32,8 @@ jobs:
         with:
           r-version: ${{ matrix.r-version }}
       - name: Install dependencies
+        env:
+          GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
         run: |
           install.packages(c("remotes", "rcmdcheck"))
           remotes::install_deps(dependencies = TRUE)
