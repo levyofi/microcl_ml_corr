@@ -1,8 +1,7 @@
 Package: microclCorr
 Title: Machine Learning Correction of Microclimate Model Predictions
 Version: 0.1.0
-Authors@R: c(
-    person("Anonymous", "Author", role = c("aut", "cre")))
+Authors@R: person("Anonymous", "Author", email = "anonymous@example.com", role = c("aut", "cre"))
 Description: Provides functions to train Random Forest and LSTM models
     that correct systematic biases in physical microclimate model predictions
     (e.g. NicheMapR) using temperature logger measurements. Supports data
@@ -11,7 +10,7 @@ Description: Provides functions to train Random Forest and LSTM models
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
-RoxygenNote: 7.3.2
+RoxygenNote: 8.1.0
 Imports:
     ranger,
     keras3,
@@ -25,5 +24,9 @@ Suggests:
     knitr,
     rmarkdown,
     reticulate
+Remotes:
+    mrke/NicheMapR
 Config/testthat/edition: 3
 VignetteBuilder: knitr
+Depends:
+    R (>= 4.1.0)
