@@ -100,7 +100,7 @@ See the [preprocessing examples](inst/examples/preprocessing_examples/) for read
 
 ### 1. Download and install locally
 
-To install from a local copy or downloaded repository:
+For review of this anonymized repository, download and install the package locally:
 
 ```R
 # Install remotes if you haven't already
