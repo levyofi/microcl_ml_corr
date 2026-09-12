@@ -98,13 +98,16 @@ See the [preprocessing examples](inst/examples/preprocessing_examples/) for read
 
 ## Installation
 
-### 1. Install the package
+### 1. Download and install locally
+
+To install from a local copy or downloaded repository:
 
 ```R
-# Install devtools if you haven't already
-if (!requireNamespace("devtools", quietly = TRUE)) install.packages("devtools")
+# Install remotes if you haven't already
+if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
 
-devtools::install_github("anonymous/microcl_ml_corr")
+# Install from current working directory
+remotes::install_local(".")
 ```
 
 ### 2. Install core dependencies
