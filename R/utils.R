@@ -51,7 +51,7 @@ load_correction_model <- function(path) {
 #' @export
 setup_tensorflow <- function() {
   if (!requireNamespace("reticulate", quietly = TRUE)) {
-    install.packages("reticulate")
+    stop("Package 'reticulate' is required to set up TensorFlow. Please install it using install.packages('reticulate').")
   }
   
   if (Sys.getenv("KERAS_HOME") == "") {
