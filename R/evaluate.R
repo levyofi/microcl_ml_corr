@@ -3,7 +3,7 @@
 
 #' Evaluate correction quality
 #'
-#' Computes RMSE and R² for both the base (uncorrected) predictions
+#' Computes RMSE and R^2 for both the base (uncorrected) predictions
 #' and the ML-corrected predictions.
 #'
 #' @param model Trained model (ranger or keras)
@@ -32,7 +32,7 @@ evaluate_correction <- function(model, X, y, base_prediction,
   rmse_base <- sqrt(mean((measured - base_prediction)^2))
   rmse_corr <- sqrt(mean((measured - corrected)^2))
 
-  # R²
+  # R^2
   ss_tot <- sum((measured - mean(measured))^2)
   r2_base <- 1 - sum((measured - base_prediction)^2) / ss_tot
   r2_corr <- 1 - sum((measured - corrected)^2) / ss_tot
@@ -56,8 +56,8 @@ print_metrics <- function(metrics, model_name = "") {
   }
   cat(sprintf("  RMSE base:      %.4f\n", metrics$rmse_base))
   cat(sprintf("  RMSE corrected: %.4f\n", metrics$rmse_corr))
-  cat(sprintf("  R² base:        %.4f\n", metrics$r2_base))
-  cat(sprintf("  R² corrected:   %.4f\n", metrics$r2_corr))
+  cat(sprintf("  R^2 base:        %.4f\n", metrics$r2_base))
+  cat(sprintf("  R^2 corrected:   %.4f\n", metrics$r2_corr))
   cat(sprintf("  Improvement:    %.1f%%\n",
               (1 - metrics$rmse_corr / metrics$rmse_base) * 100))
 }
