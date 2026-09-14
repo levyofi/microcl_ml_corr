@@ -14,6 +14,15 @@
 #' @param window_size Window size (for LSTM only)
 #' @param datetime_col Datetime column name (for LSTM windowing)
 #' @return Data.frame with base_prediction, correction, corrected_prediction
+#' @examples
+#' \dontrun{
+#' corrected_rf <- correct_predictions(
+#'   model        = rf,
+#'   new_data     = splits$test,
+#'   model_type   = "rf",
+#'   feature_cols = feat_cols
+#' )
+#' }
 #' @export
 correct_predictions <- function(model, new_data,
                                 model_type = c("rf", "lstm"),
