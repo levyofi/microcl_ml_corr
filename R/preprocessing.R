@@ -113,6 +113,10 @@ add_cyclical_time <- function(df, datetime_col = "time", add_month = FALSE) {
 #' @param val_blocks Optional. Pre-defined validation block indices.
 #' @param test_blocks Optional. Pre-defined test block indices.
 #' @return A list with elements: train, val, test (data.frames)
+#' @examples
+#' \dontrun{
+#' splits <- split_train_val_test(df, block_days = 7, seed = 42)
+#' }
 #' @export
 split_train_val_test <- function(data,
                                  train_pct = 0.75,
@@ -201,6 +205,15 @@ split_train_val_test <- function(data,
 #' @param datetime_col Datetime column name
 #' @param seed Random seed
 #' @return List with train, val, test data.frames
+#' @examples
+#' \dontrun{
+#' splits_s <- stratified_split_train_val_test(
+#'   df,
+#'   stratify_col = "time_series_doc",
+#'   block_days   = 7,
+#'   seed         = 42
+#' )
+#' }
 #' @export
 stratified_split_train_val_test <- function(data,
                                             train_pct = 0.75,
@@ -266,6 +279,10 @@ stratified_split_train_val_test <- function(data,
 #' @param microhabitat_col Microhabitat column name
 #' @param prediction_col Prediction column name
 #' @return List with scaled train, val, test data.frames and scaler info
+#' @examples
+#' \dontrun{
+#' scaled <- lstm_scaling(splits$train, splits$val, splits$test)
+#' }
 #' @export
 lstm_scaling <- function(train, val, test,
                          avoid_cols = .default_cols$avoid,
@@ -312,6 +329,17 @@ lstm_scaling <- function(train, val, test,
 #' @param window_size Integer window length
 #' @param max_gap_hours Maximum allowed gap in hours between consecutive points. NULL to disable.
 #' @return List with X (3D array), y, base_pred, datetime
+#' @examples
+#' \dontrun{
+#' win <- make_windows(
+#'   X_mat         = as.matrix(site_a_train[, feat_cols]),
+#'   y_vec         = site_a_train$residual,
+#'   base_pred_vec = site_a_train$predicted,
+#'   datetime_vec  = site_a_train$time,
+#'   window_size   = 6,
+#'   max_gap_hours = 1
+#' )
+#' }
 #' @export
 make_windows <- function(X_mat, y_vec, base_pred_vec, datetime_vec,
                          window_size, max_gap_hours = 1) {
@@ -477,6 +505,14 @@ one_dataset_lstm_preprocessing <- function(data_set, window_size, unique_ts_site
 #' @param window_size Window size for LSTM
 #' @param ts_names_col Column with site/time-series identifiers
 #' @return List with train_dict, val_dict, test_dict, index_info
+#' @examples
+#' \dontrun{
+#' lstm_data <- lstm_specific_preprocessing(
+#'   scaled$train, scaled$val, scaled$test,
+#'   window_size  = 6,
+#'   ts_names_col = "time_series_doc"
+#' )
+#' }
 #' @export
 lstm_specific_preprocessing <- function(train, val, test, window_size,
                                         ts_names_col = "time_series_doc") {
