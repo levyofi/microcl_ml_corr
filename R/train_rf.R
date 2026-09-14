@@ -18,6 +18,19 @@
 #' @param val_y Optional validation targets
 #' @param seed Random seed
 #' @return A fitted ranger model
+#' @examples
+#' \dontrun{
+#' rf <- train_rf(
+#'   train_X        = splits$train[, feat_cols],
+#'   train_y        = splits$train$residual,
+#'   num_trees      = 500,
+#'   tune           = TRUE,
+#'   n_combinations = 5,
+#'   val_X          = splits$val[, feat_cols],
+#'   val_y          = splits$val$residual,
+#'   seed           = 42
+#' )
+#' }
 #' @export
 train_rf <- function(train_X, train_y,
                      num_trees = 500,
