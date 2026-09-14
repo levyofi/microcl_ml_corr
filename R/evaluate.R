@@ -12,6 +12,16 @@
 #' @param base_prediction Base model predictions
 #' @param model_type Character: "rf" or "lstm"
 #' @return A list with rmse_base, rmse_corr, r2_base, r2_corr
+#' @examples
+#' \dontrun{
+#' metrics <- evaluate_correction(
+#'   model           = rf,
+#'   X               = splits$test[, feat_cols],
+#'   y               = splits$test$residual,
+#'   base_prediction = splits$test$predicted,
+#'   model_type      = "rf"
+#' )
+#' }
 #' @export
 evaluate_correction <- function(model, X, y, base_prediction,
                                 model_type = c("rf", "lstm")) {
