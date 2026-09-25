@@ -5,3 +5,10 @@
 ^dev$
 ^outputs$
 ^\.github$
+^\.git$
+^\.DS_Store$
+^.*\.DS_Store$
+^run_workflow\.R$
+^run_example\.R$
+^inst/examples$
+
