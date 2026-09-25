@@ -19,8 +19,6 @@ Imports:
     tensorflow,
     stats
 Suggests:
-    dplyr,
-    data.table,
     testthat (>= 3.0.0),
     knitr,
     rmarkdown,
