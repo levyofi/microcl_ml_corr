@@ -132,6 +132,21 @@ library(reticulate)
 use_condaenv("your_env_name", required = TRUE)
 ```
 
+### 4. Running `R CMD check` (For Reviewers)
+
+To perform package verification and execute the full test suite and vignette build:
+
+```bash
+# Install all required and suggested dependencies
+Rscript -e 'install.packages(c("knitr", "testthat", "ranger", "keras3", "tensorflow", "reticulate", "rmarkdown"), repos = "https://cloud.r-project.org")'
+
+# Build the source package
+R CMD build microcl_ml_corr-3E14
+
+# Run R CMD check on the built tarball
+R CMD check microclCorr_0.1.0.tar.gz
+```
+
 ---
 
 ## Examples
