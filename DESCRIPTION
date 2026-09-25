@@ -2,6 +2,8 @@ Package: microclCorr
 Title: Machine Learning Correction of Microclimate Model Predictions
 Version: 0.1.0
 Authors@R: person("Anonymous", "Author", email = "anonymous@example.com", role = c("aut", "cre"))
+Author: Anonymous Author [aut, cre]
+Maintainer: Anonymous Author <anonymous@example.com>
 Description: Provides functions to train Random Forest and LSTM models
     that correct systematic biases in physical microclimate model predictions
     (e.g. NicheMapR) using temperature logger measurements. Supports data
