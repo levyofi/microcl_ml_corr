@@ -21,6 +21,17 @@ evaluate_correction(model, X, y, base_prediction, model_type = c("rf", "lstm"))
 A list with rmse_base, rmse_corr, r2_base, r2_corr
 }
 \description{
-Computes RMSE and R² for both the base (uncorrected) predictions
+Computes RMSE and R^2 for both the base (uncorrected) predictions
 and the ML-corrected predictions.
+}
+\examples{
+\dontrun{
+metrics <- evaluate_correction(
+  model           = rf,
+  X               = splits$test[, feat_cols],
+  y               = splits$test$residual,
+  base_prediction = splits$test$predicted,
+  model_type      = "rf"
+)
+}
 }

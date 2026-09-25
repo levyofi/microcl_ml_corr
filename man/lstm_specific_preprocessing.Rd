@@ -29,3 +29,12 @@ List with train_dict, val_dict, test_dict, index_info
 \description{
 Creates windowed datasets for all three splits, tracking per-site indices.
 }
+\examples{
+\dontrun{
+lstm_data <- lstm_specific_preprocessing(
+  scaled$train, scaled$val, scaled$test,
+  window_size  = 6,
+  ts_names_col = "time_series_doc"
+)
+}
+}

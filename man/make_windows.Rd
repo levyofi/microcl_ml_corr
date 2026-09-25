@@ -33,3 +33,15 @@ List with X (3D array), y, base_pred, datetime
 Rearranges time-series data into sliding windows of fixed size.
 Skips windows that contain temporal gaps larger than max_gap_hours.
 }
+\examples{
+\dontrun{
+win <- make_windows(
+  X_mat         = as.matrix(site_a_train[, feat_cols]),
+  y_vec         = site_a_train$residual,
+  base_pred_vec = site_a_train$predicted,
+  datetime_vec  = site_a_train$time,
+  window_size   = 6,
+  max_gap_hours = 1
+)
+}
+}

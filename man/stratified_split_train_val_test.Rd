@@ -36,3 +36,13 @@ List with train, val, test data.frames
 Splits by shuffled N-day blocks, ensuring balanced representation
 across a stratification column (e.g., location or site).
 }
+\examples{
+\dontrun{
+splits_s <- stratified_split_train_val_test(
+  df,
+  stratify_col = "time_series_doc",
+  block_days   = 7,
+  seed         = 42
+)
+}
+}

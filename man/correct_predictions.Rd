@@ -39,3 +39,13 @@ Data.frame with base_prediction, correction, corrected_prediction
 Takes a trained model and new NicheMapR output data, predicts the
 residual correction, and returns corrected predictions.
 }
+\examples{
+\dontrun{
+corrected_rf <- correct_predictions(
+  model        = rf,
+  new_data     = splits$test,
+  model_type   = "rf",
+  feature_cols = feat_cols
+)
+}
+}

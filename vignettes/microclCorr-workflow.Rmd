@@ -1,0 +1,411 @@
+---
+title: "Microclimate Model Correction Workflow with microclCorr"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Microclimate Model Correction Workflow with microclCorr}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/vignette-",
+  out.width = "100%"
+)
+```
+
+## Introduction
+
+Physical microclimate models such as **NicheMapR** calculate microenvironmental conditions (temperature, humidity, solar radiation) from first physical principles, including terrain topography, radiative transfer, and convective heat balance. While these mechanistic models provide broad spatiotemporal predictions, local microtopography, fine-scale shading, and boundary-layer dynamics often introduce systematic prediction biases.
+
+`microclCorr` provides a machine learning post-processing framework to correct these systematic residuals using in-situ temperature logger data. Rather than replacing the physical model, `microclCorr` models the residual difference:
+
+$$\text{residual} = T_{\text{measured}} - T_{\text{predicted}}$$
+
+Once the machine learning model estimates the residual ($\widehat{\text{residual}}$), the final corrected temperature prediction is:
+
+$$T_{\text{corrected}} = T_{\text{predicted}} + \widehat{\text{residual}}$$
+
+The package supports two machine learning paradigms:
+- **Random Forest (RF)**: Robust, tabular ensemble learning that handles nonlinear feature interactions with minimal tuning.
+- **Long Short-Term Memory (LSTM)**: Recurrent neural network that captures temporal sequence dependencies and thermal inertia over sliding time windows.
+
+---
+
+## Workflow Overview
+
+The correction pipeline consists of data preparation, feature engineering, model training and hyperparameter tuning, model evaluation, and deployment to new predictions:
+
+```{r workflow-diagram, echo = FALSE, out.width = "95%", fig.align = "center", purl = FALSE}
+img_path <- if (file.exists("workflow_combined.png")) "workflow_combined.png" else file.path("vignettes", "workflow_combined.png")
+knitr::include_graphics(img_path)
+```
+
+---
+
+## Pipeline Stages
+
+### 1. Data Preparation and Ingestion
+
+The input data consists of time-aligned observations where physical model predictions and logger measurements have been paired. Columns typically include:
+
+- `time`: Date-time timestamp
+- `measured`: Logger measurement ($^\circ\text{C}$)
+- `predicted`: Physical model prediction ($^\circ\text{C}$)
+- `residual`: Measured temperature minus predicted temperature
+- Environmental predictors (e.g. ambient air temperature, solar radiation, wind speed, relative humidity)
+- Optional grouping columns (e.g. `microhabitat` or `time_series_doc`)
+
+```{r eval = FALSE}
+library(microclCorr)
+
+# Ingest prepared dataset
+data <- load_prepared_csv_data(
+  path                       = "path/to/aligned_data.csv",
+  is_continuous_microhabitat = FALSE,
+  datetime_format            = "%Y-%m-%d %H:%M:%S",
+  includes_index             = FALSE
+)
+```
+
+### 2. Feature Engineering & Temporal Splitting
+
+Cyclical temporal features (hour of day, day of year) are extracted using sine and cosine transformations:
+
+```{r eval = FALSE}
+# Add cyclical diurnal features
+data <- add_cyclical_time(data, datetime_col = "time")
+
+# Automatically detect predictor features (excluding identifiers and target variables)
+feature_cols <- get_feature_columns(data)
+```
+
+To avoid temporal data leakage (where random splitting lets models interpolate between adjacent hours), `microclCorr` uses **blocked cross-validation**:
+
+```{r eval = FALSE}
+# Block-temporal split: 75% train, 12.5% validation, 12.5% test in 7-day blocks
+splits <- split_train_val_test(
+  data       = data,
+  train_pct  = 0.75,
+  val_pct    = 0.125,
+  block_days = 7,
+  seed       = 42
+)
+```
+
+---
+
+### 3. Model Training
+
+#### Random Forest
+Random Forest fits an ensemble of regression trees to predict residuals from feature variables:
+
+```{r eval = FALSE}
+rf_model <- train_rf(
+  train_X        = splits$train[, feature_cols],
+  train_y        = splits$train$residual,
+  num_trees      = 500,
+  tune           = TRUE,
+  n_combinations = 10,
+  val_X          = splits$val[, feature_cols],
+  val_y          = splits$val$residual,
+  seed           = 42
+)
+```
+
+#### LSTM Neural Network
+
+LSTM models capture temporal memory and thermal inertia. Because LSTM models rely on TensorFlow and Keras via `reticulate`, declare TensorFlow at the start of your R session (especially in RStudio):
+
+```{r eval = FALSE}
+library(reticulate)
+py_require("tensorflow")
+# Alternatively: microclCorr::setup_tensorflow()
+```
+
+Data are scaled and structured into fixed sliding sequence windows before model training:
+
+```{r eval = FALSE}
+# Normalize features using min-max scaling fitted strictly on training data
+scaled <- lstm_scaling(splits$train, splits$val, splits$test)
+
+# Reshape continuous time series into sliding sequence windows (e.g. 6-hour lookback)
+lstm_data <- lstm_specific_preprocessing(
+  train        = scaled$train,
+  val          = scaled$val,
+  test         = scaled$test,
+  window_size  = 6,
+  ts_names_col = "time_series_doc"
+)
+```
+
+##### Automated Hyperparameter Tuning (`lstm_hypertuning`)
+
+Rather than relying on arbitrary neural architecture choices, `lstm_hypertuning()` performs random search across key structural and optimization parameters:
+
+- **`units_range`**: Hidden LSTM units per layer (sampled in steps of 32)
+- **`layers_range`**: Number of stacked LSTM layers
+- **`dropout_range`**: Dropout rate between layers to prevent overfitting
+- **`lr_range`**: Learning rate for the Adam optimizer (sampled log-uniformly)
+
+Early stopping (`patience`) halts non-improving epochs early to prevent overfitting:
+
+```{r eval = FALSE}
+# Search for optimal LSTM architecture over random trials
+hpo <- lstm_hypertuning(
+  train_X       = lstm_data$train_dict$X,
+  train_y       = lstm_data$train_dict$y,
+  val_X         = lstm_data$val_dict$X,
+  val_y         = lstm_data$val_dict$y,
+  n_trials      = 5,
+  units_range   = c(32, 256),
+  layers_range  = c(1, 2),
+  dropout_range = c(0.0, 0.3),
+  lr_range      = c(1e-4, 1e-2),
+  epochs        = 60,
+  batch_size    = 32,
+  patience      = 8,
+  seed          = 42
+)
+
+# Best configuration and corresponding fitted model
+best_params <- hpo$params
+lstm_model  <- hpo$model
+cat(sprintf("Best architecture: %d units, %d layers, dropout = %.2f, lr = %.5f\n",
+            best_params$n_units, best_params$n_layers, best_params$dropout, best_params$lr))
+```
+
+Alternatively, if preferred hyperparameters are already known, a specific architecture can be trained directly using `train_lstm()`:
+
+```{r eval = FALSE}
+# Direct training with fixed hyperparameters
+lstm_model <- train_lstm(
+  train_X    = lstm_data$train_dict$X,
+  train_y    = lstm_data$train_dict$y,
+  val_X      = lstm_data$val_dict$X,
+  val_y      = lstm_data$val_dict$y,
+  n_units    = 64,
+  n_layers   = 2,
+  dropout    = 0.1,
+  lr         = 0.001,
+  epochs     = 100,
+  batch_size = 32,
+  patience   = 10,
+  seed       = 42
+)
+```
+
+---
+
+### 4. Evaluation and Model Selection
+
+Performance is quantified by comparing the Root Mean Square Error (RMSE) and coefficient of determination ($R^2$) of the raw physical model predictions against the ML-corrected predictions.
+
+#### Aligning Test Sets (`align_test_sets`)
+Because LSTM sequence windows omit the first $(window\_size - 1)$ hours of each time series, `align_test_sets()` filters the Random Forest test set to evaluate both models on identical timestamps:
+
+```{r eval = FALSE}
+# Align tabular test set to match LSTM window endpoints
+aligned_test_rf <- align_test_sets(
+  test_dataset   = splits$test,
+  lstm_test_dict = lstm_data$test_dict,
+  ts_index_info  = lstm_data$index_info,
+  site_name_col  = "time_series_doc",
+  datetime_col   = "time"
+)
+
+# Evaluate Random Forest on aligned test set
+metrics_rf <- evaluate_correction(
+  model           = rf_model,
+  X               = aligned_test_rf[, feature_cols],
+  y               = aligned_test_rf$residual,
+  base_prediction = aligned_test_rf$predicted,
+  model_type      = "rf"
+)
+
+# Evaluate LSTM on test windows
+metrics_lstm <- evaluate_correction(
+  model           = lstm_model,
+  X               = lstm_data$test_dict$X,
+  y               = lstm_data$test_dict$y,
+  base_prediction = lstm_data$test_dict$base_pred,
+  model_type      = "lstm"
+)
+
+metrics_rf
+metrics_lstm
+```
+
+---
+
+### 5. Deployment and Inference
+
+The selected model and associated metadata (feature columns, scalers) are bundled and saved. For LSTM models, the min-max scaler is bundled to transform new observations:
+
+```{r eval = FALSE}
+# Save Random Forest bundle (scaler = NULL)
+save_correction_model(
+  model        = rf_model,
+  scaler       = NULL,
+  feature_cols = feature_cols,
+  path         = "best_rf_model.rds"
+)
+
+# Save LSTM bundle (includes scaler parameters)
+save_correction_model(
+  model        = lstm_model,
+  scaler       = scaled$scaler,
+  feature_cols = feature_cols,
+  path         = "best_lstm_model.rds"
+)
+
+# Load model and apply correction to new physical model predictions
+loaded_bundle <- load_correction_model("best_rf_model.rds")
+
+corrected_df <- correct_predictions(
+  model        = loaded_bundle$model,
+  new_data     = new_physical_data,
+  model_type   = loaded_bundle$model_type,
+  feature_cols = loaded_bundle$feature_cols
+)
+```
+
+---
+
+## Reproducible End-to-End Example
+
+The following self-contained example demonstrates the complete pipeline on synthetic microclimate data:
+
+```{r reproducible-example}
+library(microclCorr)
+
+# 1. Generate synthetic hourly microclimate observations
+set.seed(42)
+n_hours <- 240
+times <- seq(as.POSIXct("2024-05-01 00:00:00", tz = "UTC"), by = "hour", length.out = n_hours)
+
+# Simulating physical model prediction with diurnal cycle
+physical_pred <- 20 + 7 * sin(2 * pi * (1:n_hours) / 24)
+
+# Simulating true temperature with a systematic 3°C bias plus nonlinear thermal response
+ambient_temp <- physical_pred + rnorm(n_hours, mean = 0, sd = 0.5)
+solar_flux <- pmax(0, 800 * sin(pi * ((1:n_hours) %% 24) / 24) + rnorm(n_hours, 0, 30))
+measured_temp <- physical_pred + 2.5 + 0.003 * solar_flux + rnorm(n_hours, mean = 0, sd = 0.4)
+true_residual <- measured_temp - physical_pred
+
+df <- data.frame(
+  time = times,
+  predicted = physical_pred,
+  temp_air = ambient_temp,
+  solar_rad = solar_flux,
+  residual = true_residual,
+  time_series_doc = "sensor_1"
+)
+
+# 2. Add cyclical features
+df <- add_cyclical_time(df, datetime_col = "time")
+features <- c("temp_air", "solar_rad", "Hour_sin", "Hour_cos")
+
+# 3. Partition into train / test sets
+splits <- split_train_val_test(df, train_pct = 0.70, val_pct = 0.15, block_days = 2, seed = 42)
+
+# 4. Train Random Forest model
+rf_mod <- train_rf(
+  train_X   = splits$train[, features],
+  train_y   = splits$train$residual,
+  num_trees = 50,
+  tune      = FALSE,
+  seed      = 42
+)
+
+# 5. Evaluate correction on test set
+eval_res <- evaluate_correction(
+  model           = rf_mod,
+  X               = splits$test[, features],
+  y               = splits$test$residual,
+  base_prediction = splits$test$predicted,
+  model_type      = "rf"
+)
+
+eval_res
+
+# 6. Apply correction to new data
+corrected_output <- correct_predictions(
+  model        = rf_mod,
+  new_data     = splits$test,
+  model_type   = "rf",
+  feature_cols = features
+)
+
+head(corrected_output)
+```
+
+### Extending to LSTM with Hyperparameter Tuning
+
+For datasets with strong temporal autocorrelation or thermal inertia, an LSTM network can be tuned and compared directly against Random Forest using the same synthetic dataset:
+
+```{r lstm-reproducible-example, eval = FALSE}
+# 0. Ensure TensorFlow is declared at the start of your R session
+library(reticulate)
+py_require("tensorflow")
+# Alternatively: microclCorr::setup_tensorflow()
+
+# 1. Feature normalization (min-max scaling fit on training set)
+scaled <- lstm_scaling(splits$train, splits$val, splits$test)
+
+# 2. Reshape into sliding sequence windows (e.g. 4-hour temporal lookback)
+lstm_data <- lstm_specific_preprocessing(
+  train        = scaled$train,
+  val          = scaled$val,
+  test         = scaled$test,
+  window_size  = 4,
+  ts_names_col = "time_series_doc"
+)
+
+# 3. Automated hyperparameter tuning with early stopping
+hpo <- lstm_hypertuning(
+  train_X       = lstm_data$train_dict$X,
+  train_y       = lstm_data$train_dict$y,
+  val_X         = lstm_data$val_dict$X,
+  val_y         = lstm_data$val_dict$y,
+  n_trials      = 3,
+  units_range   = c(32, 128),
+  layers_range  = c(1, 2),
+  dropout_range = c(0.0, 0.2),
+  lr_range      = c(1e-3, 5e-3),
+  epochs        = 30,
+  batch_size    = 16,
+  patience      = 5,
+  seed          = 42
+)
+
+# Retrieve best tuned model and architecture parameters
+best_lstm <- hpo$model
+print(hpo$params)
+
+# 4. Evaluate LSTM predictions on test windows
+eval_lstm <- evaluate_correction(
+  model           = best_lstm,
+  X               = lstm_data$test_dict$X,
+  y               = lstm_data$test_dict$y,
+  base_prediction = lstm_data$test_dict$base_pred,
+  model_type      = "lstm"
+)
+
+eval_lstm
+
+# 5. Apply LSTM correction to new observations
+corrected_lstm <- correct_predictions(
+  model        = best_lstm,
+  new_data     = splits$test,
+  model_type   = "lstm",
+  feature_cols = features,
+  scaler       = scaled$scaler,
+  window_size  = 4,
+  datetime_col = "time"
+)
+
+head(corrected_lstm)
+```

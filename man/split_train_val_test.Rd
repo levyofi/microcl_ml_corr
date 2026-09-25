@@ -45,3 +45,8 @@ A list with elements: train, val, test (data.frames)
 Splits by shuffled N-day blocks (recommended) or simple chronological split.
 This is a faithful port of \code{train_val_test_split} from the Python pipeline.
 }
+\examples{
+\dontrun{
+splits <- split_train_val_test(df, block_days = 7, seed = 42)
+}
+}

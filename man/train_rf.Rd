@@ -48,3 +48,17 @@ A fitted ranger model
 Trains a ranger Random Forest to predict residuals (measured - predicted).
 Optionally performs hyperparameter tuning via out-of-bag error.
 }
+\examples{
+\dontrun{
+rf <- train_rf(
+  train_X        = splits$train[, feat_cols],
+  train_y        = splits$train$residual,
+  num_trees      = 500,
+  tune           = TRUE,
+  n_combinations = 5,
+  val_X          = splits$val[, feat_cols],
+  val_y          = splits$val$residual,
+  seed           = 42
+)
+}
+}

@@ -36,3 +36,8 @@ List with scaled train, val, test data.frames and scaler info
 Performs MinMax scaling on feature columns. The scaler is fit only to
 the training data to avoid data leakage.
 }
+\examples{
+\dontrun{
+scaled <- lstm_scaling(splits$train, splits$val, splits$test)
+}
+}

@@ -19,22 +19,14 @@ build_lstm <- function(input_shape,
                        dropout = 0.1,
                        lr = 0.001) {
 
-  model <- keras3::keras_model_sequential()
+  model <- keras3::keras_model_sequential(input_shape = input_shape)
 
   for (i in seq_len(n_layers)) {
     return_seq <- (i < n_layers)  # return sequences for all but last LSTM
-    if (i == 1) {
-      model |> keras3::layer_lstm(
-        units = n_units,
-        return_sequences = return_seq,
-        input_shape = input_shape
-      )
-    } else {
-      model |> keras3::layer_lstm(
-        units = n_units,
-        return_sequences = return_seq
-      )
-    }
+    model |> keras3::layer_lstm(
+      units = n_units,
+      return_sequences = return_seq
+    )
   }
 
   model |>

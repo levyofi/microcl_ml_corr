@@ -51,3 +51,26 @@ A trained keras model
 Builds and trains a stacked LSTM on windowed time-series data.
 Uses early stopping on validation loss.
 }
+\examples{
+\dontrun{
+lstm_data <- lstm_specific_preprocessing(
+  scaled$train, scaled$val, scaled$test,
+  window_size = 6, ts_names_col = "time_series_doc"
+)
+
+lstm_model <- train_lstm(
+  train_X    = lstm_data$train_dict$X,
+  train_y    = lstm_data$train_dict$y,
+  val_X      = lstm_data$val_dict$X,
+  val_y      = lstm_data$val_dict$y,
+  n_units    = 64,
+  n_layers   = 2,
+  dropout    = 0.1,
+  lr         = 0.001,
+  epochs     = 100,
+  batch_size = 32,
+  patience   = 10,
+  seed       = 42
+)
+}
+}
