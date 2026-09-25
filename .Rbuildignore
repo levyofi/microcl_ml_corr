@@ -10,5 +10,4 @@
 ^.*\.DS_Store$
 ^run_workflow\.R$
 ^run_example\.R$
-^inst/examples$
 
