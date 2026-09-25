@@ -100,14 +100,14 @@ See the [preprocessing examples](inst/examples/preprocessing_examples/) for read
 
 ### 1. Download and install locally
 
-For review of this anonymized repository, download and install the package locally:
+For review of this anonymized repository, download the repository as a zip file from https://anonymous.4open.science/r/microcl_ml_corr-3E14/ and install the package locally:
 
 ```R
 # Install remotes if you haven't already
 if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
 
 # Install from current working directory
-remotes::install_local(".")
+remotes::install_local("microcl_ml_corr-3E14.zip")
 ```
 
 ### 2. Install core dependencies
