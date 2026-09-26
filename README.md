@@ -116,15 +116,37 @@ R CMD check --no-manual microclCorr_0.1.0.tar.gz
 
 ### 1. Download and install locally
 
-For review of this anonymized repository, download the repository as a zip file from https://anonymous.4open.science/r/microcl_ml_corr-3E14/ and install the package locally:
+#### Option A: Install from the pre-built tarball (`microclCorr_0.1.0.tar.gz`)
+
+Download `microclCorr_0.1.0.tar.gz` from the repository and install it directly:
 
 ```R
-# Install remotes if you haven't already
-if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
+# In R:
+install.packages("microclCorr_0.1.0.tar.gz", repos = NULL, type = "source")
 
-# Install from current working directory
+# Or using remotes:
+if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
+remotes::install_local("microclCorr_0.1.0.tar.gz")
+```
+
+Alternatively, from the terminal:
+```bash
+R CMD INSTALL microclCorr_0.1.0.tar.gz
+```
+
+#### Option B: Download the full repository (to access examples and raw datasets)
+
+The pre-built `.tar.gz` package contains all package functions and compiled vignettes. If you also want to inspect or reproduce the empirical scenario scripts (`inst/examples/`) and accompanying datasets (`inst/extdata/`), download the full repository as a ZIP archive from:
+
+> **[https://anonymous.4open.science/r/microcl_ml_corr-3E14/](https://anonymous.4open.science/r/microcl_ml_corr-3E14/)**
+
+You can install the package directly from the downloaded ZIP file:
+
+```R
+if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
 remotes::install_local("microcl_ml_corr-3E14.zip")
 ```
+
 
 ### 2. Install core dependencies
 
