@@ -107,8 +107,8 @@ Rscript -e 'install.packages(c("knitr", "testthat", "ranger", "keras3", "tensorf
 # Build the source package
 R CMD build microcl_ml_corr-3E14
 
-# Run R CMD check on the built tarball
-R CMD check microclCorr_0.1.0.tar.gz
+# Run R CMD check on the built tarball (--no-manual skips PDF manual generation if LaTeX/pdflatex is not installed)
+R CMD check --no-manual microclCorr_0.1.0.tar.gz
 ```
 
 ---

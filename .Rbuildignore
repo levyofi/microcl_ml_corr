@@ -13,5 +13,8 @@
 ^inst/examples$
 ^inst/extdata$
 ^.*\.tar\.gz$
+^\.claude$
+^.*\.claude.*$
+
 
 
