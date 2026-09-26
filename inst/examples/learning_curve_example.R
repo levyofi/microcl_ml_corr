@@ -34,7 +34,7 @@ source(system.file("examples", "utils.R", package = "microclCorr"))
 SEED      <- 123
 SITE      <- "harod2_shd.csv"   # which logger to analyse
 SITE_COL  <- "time_series_doc"  # column that identifies each logger
-DATA_PATH <- system.file("extdata", "Harod_dataset.csv", package = "microclCorr")
+DATA_PATH <- get_example_data("Harod_dataset.csv")
 
 # ── Step 1: Load and prepare the data ─────────────────────────────────────────
 # These are the same steps as in run_scenario_1.R — repeated here so this

@@ -20,8 +20,8 @@ cat("\n=== Scenario 8: Zero-Shot Transfer ===\n")
 SCENARIO_DIR <- if (dir.exists("scenario_8_zero_shot_transfer")) "scenario_8_zero_shot_transfer" else "."
 RESULTS_DIR  <- file.path(SCENARIO_DIR, "results")
 
-DATA_PATH_B   <- system.file("extdata", "Beach_data_preprocessed.csv", package = "microclCorr")
-SPLITS_PATH_B <- system.file("extdata", "beach_splits.csv", package = "microclCorr")
+DATA_PATH_B   <- get_example_data("Beach_data_preprocessed.csv")
+SPLITS_PATH_B <- get_example_data("beach_splits.csv")
 SITE_COL_B    <- "time_series_site"
 
 data_b   <- load_prepared_csv_data(DATA_PATH_B, is_continuous_microhabitat = FALSE, datetime_format = "%Y-%m-%d %H:%M:%S", includes_index = TRUE)

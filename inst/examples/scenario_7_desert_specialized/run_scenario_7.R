@@ -17,8 +17,8 @@ library(microclCorr)
 SEED        <- 42
 SITE_COL    <- "site_id"
 
-DATA_PATH   <- system.file("extdata", "desert_data_preprocessed.csv", package = "microclCorr")
-SPLITS_PATH <- system.file("extdata", "desert_splits.csv",            package = "microclCorr")
+DATA_PATH   <- get_example_data("desert_data_preprocessed.csv")
+SPLITS_PATH <- get_example_data("desert_splits.csv")
 RESULTS_DIR <- file.path("inst", "examples", "scenario_7_desert_specialized", "results")
 dir.create(RESULTS_DIR, showWarnings = FALSE, recursive = TRUE)
 

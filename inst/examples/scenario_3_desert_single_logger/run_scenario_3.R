@@ -43,7 +43,7 @@ library(gridExtra)
 SEED     <- 123            # fixing the random seed makes results reproducible
 SITE_COL <- "site_id"     # column that identifies each logger
 
-DATA_PATH    <- system.file("extdata", "desert_data_preprocessed.csv", package = "microclCorr")
+DATA_PATH    <- get_example_data("desert_data_preprocessed.csv")
 SCENARIO_DIR <- file.path("inst", "examples", "scenario_3_desert_single_logger")
 RESULTS_DIR  <- file.path(SCENARIO_DIR, "results")
 dir.create(RESULTS_DIR, showWarnings = FALSE, recursive = TRUE)

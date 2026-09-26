@@ -14,7 +14,7 @@ source(file.path(pkg_base, "utils.R"))
 
 SCENARIO_DIR <- "."
 RESULTS_DIR  <- file.path(SCENARIO_DIR, "results")
-DATA_PATH    <- system.file("extdata", "Harod_dataset.csv", package = "microclCorr")
+DATA_PATH    <- get_example_data("Harod_dataset.csv")
 
 SEED <- 42
 

@@ -19,7 +19,7 @@ library(ggpubr)
 
 SEED <- 123
 SITE_COL_3 <- "site_id"
-DATA_PATH <- system.file("extdata", "desert_data_preprocessed.csv", package = "microclCorr")
+DATA_PATH <- get_example_data("desert_data_preprocessed.csv")
 SCENARIO_DIR <- file.path(root, "inst", "examples", "scenario_3_desert_single_logger")
 RESULTS_DIR <- file.path(SCENARIO_DIR, "results")
 

@@ -14,7 +14,7 @@ source(file.path(pkg_base, "utils.R"))
 
 SCENARIO_DIR <- "."
 RESULTS_DIR  <- file.path(SCENARIO_DIR, "results")
-DATA_PATH    <- file.path(pkg_base, "../extdata/desert_data_preprocessed.csv")
+DATA_PATH    <- get_example_data("desert_data_preprocessed.csv")
 SEED <- 42
 
 loggers <- c("Rock_S_T_2_W", "Bush_S_T_2_W")

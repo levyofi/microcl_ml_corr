@@ -40,8 +40,8 @@ SEED        <- 42    # fixing the random seed makes results reproducible
 SITE_COL    <- "time_series_site"   # column that identifies each logger
 
 # Input data (installed with the package)
-DATA_PATH   <- system.file("extdata", "Beach_data_preprocessed.csv", package = "microclCorr")
-SPLITS_PATH <- system.file("extdata", "beach_splits.csv",            package = "microclCorr")
+DATA_PATH   <- get_example_data("Beach_data_preprocessed.csv")
+SPLITS_PATH <- get_example_data("beach_splits.csv")
 
 # Where to write results
 RESULTS_DIR <- file.path("inst", "examples", "scenario_4_beach_pooled", "results")

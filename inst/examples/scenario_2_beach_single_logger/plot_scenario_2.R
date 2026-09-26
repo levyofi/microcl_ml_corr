@@ -22,7 +22,7 @@ RESULTS_DIR  <- file.path(SCENARIO_DIR, "results")
 
 SITE      <- "Ashkelon 15 m"
 SITE_COL  <- "time_series_site"
-DATA_PATH <- system.file("extdata", "Beach_data_preprocessed.csv", package = "microclCorr")
+DATA_PATH <- get_example_data("Beach_data_preprocessed.csv")
 
 data <- load_prepared_csv_data(DATA_PATH, is_continuous_microhabitat = FALSE,
                                datetime_format = "%Y-%m-%d %H:%M:%S",

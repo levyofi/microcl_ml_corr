@@ -14,7 +14,7 @@ source(file.path(pkg_base, "utils.R"))
 
 SCENARIO_DIR <- "."
 RESULTS_DIR  <- file.path(SCENARIO_DIR, "results")
-DATA_PATH    <- file.path(pkg_base, "../extdata/Beach_data_preprocessed.csv")
+DATA_PATH    <- get_example_data("Beach_data_preprocessed.csv")
 SEED <- 42
 
 data <- load_prepared_csv_data(DATA_PATH, is_continuous_microhabitat = FALSE, datetime_format = "%Y-%m-%d %H:%M:%S", includes_index = TRUE)

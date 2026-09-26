@@ -20,8 +20,8 @@ cat("\n=== Scenario 6: Desert Pooled ===\n")
 SCENARIO_DIR <- if (dir.exists("scenario_6_desert_pooled")) "scenario_6_desert_pooled" else "."
 RESULTS_DIR  <- file.path(SCENARIO_DIR, "results")
 
-DATA_PATH_D   <- system.file("extdata", "desert_data_preprocessed.csv", package = "microclCorr")
-SPLITS_PATH_D <- system.file("extdata", "desert_splits.csv", package = "microclCorr")
+DATA_PATH_D   <- get_example_data("desert_data_preprocessed.csv")
+SPLITS_PATH_D <- get_example_data("desert_splits.csv")
 SITE_COL_D    <- "site_id"
 
 data_d <- load_prepared_csv_data(DATA_PATH_D, datetime_format = "%Y-%m-%d %H:%M:%S", includes_index = TRUE)

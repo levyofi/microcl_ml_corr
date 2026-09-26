@@ -36,6 +36,27 @@ df <- rbind(make_site("site_A", 0, 1),
 
 ## Data Loading
 
+### `get_example_data()`
+
+Retrieves the local path to an example dataset. If the dataset exists locally in the package or user cache directory, its local path is returned immediately. Otherwise, it is downloaded on demand from the anonymous repository (`https://anonymous.4open.science/r/microcl_ml_corr-3E14/inst/extdata/`) and cached.
+
+**Parameters**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `filename` | character | — | Dataset filename (e.g. `"Harod_dataset.csv"`, `"Beach_data_preprocessed.csv"`, `"desert_data_preprocessed.csv"`, `"beach_splits.csv"`, `"desert_splits.csv"`) |
+| `dest_dir` | character | `NULL` | Directory where downloaded files are cached. Defaults to `tools::R_user_dir("microclCorr", "data")` |
+| `base_url` | character | `"https://anonymous.4open.science/r/microcl_ml_corr-3E14/inst/extdata/"` | Base URL for on-demand downloads |
+| `force` | logical | `FALSE` | Force re-download even if the file exists |
+
+**Returns**: `character` scalar containing the absolute path to the local CSV dataset.
+
+```r
+# Download and retrieve path on demand:
+data_path <- get_example_data("Harod_dataset.csv")
+df <- read.csv(data_path)
+```
+
 ### `load_prepared_csv_data()`
 
 Reads a pre-aligned CSV, parses the datetime column, and one-hot encodes a categorical microhabitat column.

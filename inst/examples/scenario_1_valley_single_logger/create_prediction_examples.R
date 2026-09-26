@@ -18,7 +18,7 @@ library(ggplot2)
 library(ggpubr)
 
 SEED <- 11
-DATA_PATH    <- system.file("extdata", "Harod_dataset.csv", package = "microclCorr")
+DATA_PATH    <- get_example_data("Harod_dataset.csv")
 SCENARIO_DIR <- file.path(root, "inst", "examples", "scenario_1_valley_single_logger")
 RESULTS_DIR  <- file.path(SCENARIO_DIR, "results")
 

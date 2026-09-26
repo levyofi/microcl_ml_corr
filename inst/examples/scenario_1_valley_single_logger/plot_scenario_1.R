@@ -20,7 +20,7 @@ cat("\n=== Scenario 1: Valley (Harod) ===\n")
 SCENARIO_DIR <- if (dir.exists("scenario_1_valley_single_logger")) "scenario_1_valley_single_logger" else "."
 RESULTS_DIR  <- file.path(SCENARIO_DIR, "results")
 
-DATA_PATH <- system.file("extdata", "Harod_dataset.csv", package = "microclCorr")
+DATA_PATH <- get_example_data("Harod_dataset.csv")
 
 tasks_s1 <- list(
   list(name = "harod2_air", site = "harod2_air.csv", title = "Air"),

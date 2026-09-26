@@ -2,8 +2,8 @@
 suppressPackageStartupMessages({ library(microclCorr); library(ranger); library(keras3) })
 pkg_base <- ".."; if (!file.exists(file.path(pkg_base, "package_utils.R"))) pkg_base <- system.file("examples", package = "microclCorr")
 source(file.path(pkg_base, "package_utils.R")); source(file.path(pkg_base, "utils.R"))
-RESULTS_DIR <- "./results"; DATA_PATH <- file.path(pkg_base, "../extdata/Beach_data_preprocessed.csv")
-SPLITS_PATH <- file.path(pkg_base, "../extdata/beach_splits.csv"); SITE_COL <- "time_series_site"
+RESULTS_DIR <- "./results"; DATA_PATH <- get_example_data("Beach_data_preprocessed.csv")
+SPLITS_PATH <- get_example_data("beach_splits.csv"); SITE_COL <- "time_series_site"
 data <- load_prepared_csv_data(DATA_PATH, is_continuous_microhabitat = FALSE, datetime_format = "%Y-%m-%d %H:%M:%S", includes_index = TRUE)
 if ("microhabitat_sun" %in% names(data)) data$microhabitat_sun <- NULL
 splits <- load_splits_from_csv(data, SPLITS_PATH, SITE_COL)

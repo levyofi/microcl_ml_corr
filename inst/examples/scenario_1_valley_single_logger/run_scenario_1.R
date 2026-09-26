@@ -36,7 +36,7 @@ library(gridExtra)
 # ── Settings ──────────────────────────────────────────────────────────────────
 SEED <- 42   # test block = May 14–20 (previously 123 = Apr 2–8, which showed over-correction)
 
-DATA_PATH    <- system.file("extdata", "Harod_dataset.csv", package = "microclCorr")
+DATA_PATH    <- get_example_data("Harod_dataset.csv")
 SCENARIO_DIR <- file.path("inst", "examples", "scenario_1_valley_single_logger")
 RESULTS_DIR  <- file.path(SCENARIO_DIR, "results")
 dir.create(RESULTS_DIR, showWarnings = FALSE, recursive = TRUE)

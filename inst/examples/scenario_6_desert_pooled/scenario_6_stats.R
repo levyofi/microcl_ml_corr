@@ -14,8 +14,8 @@ source(file.path(pkg_base, "utils.R"))
 
 SCENARIO_DIR <- "."
 RESULTS_DIR  <- file.path(SCENARIO_DIR, "results")
-DATA_PATH   <- file.path(pkg_base, "../extdata/desert_data_preprocessed.csv")
-SPLITS_PATH <- file.path(pkg_base, "../extdata/desert_splits.csv")
+DATA_PATH   <- get_example_data("desert_data_preprocessed.csv")
+SPLITS_PATH <- get_example_data("desert_splits.csv")
 SITE_COL    <- "site_id"
 
 data   <- load_prepared_csv_data(DATA_PATH, datetime_format = "%Y-%m-%d %H:%M:%S", includes_index = TRUE)

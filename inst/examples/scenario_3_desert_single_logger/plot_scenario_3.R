@@ -21,7 +21,7 @@ SCENARIO_DIR <- if (dir.exists("scenario_3_desert_single_logger")) "scenario_3_d
 RESULTS_DIR  <- file.path(SCENARIO_DIR, "results")
 
 SITE_COL_3 <- "site_id"
-DATA_PATH  <- system.file("extdata", "desert_data_preprocessed.csv", package = "microclCorr")
+DATA_PATH  <- get_example_data("desert_data_preprocessed.csv")
 
 tasks_s3 <- list(
   list(name = "Rock_S_T_2_W", site = "Rock_S_T_2_W", title = "Desert - Rock"),

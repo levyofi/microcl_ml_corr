@@ -20,7 +20,7 @@ library(ggpubr)
 SEED <- 123
 SITE <- "Ashkelon 15 m"
 SITE_COL <- "time_series_site"
-DATA_PATH <- system.file("extdata", "Beach_data_preprocessed.csv", package = "microclCorr")
+DATA_PATH <- get_example_data("Beach_data_preprocessed.csv")
 SCENARIO_DIR <- file.path(root, "inst", "examples", "scenario_2_beach_single_logger")
 RESULTS_DIR <- file.path(SCENARIO_DIR, "results")
 

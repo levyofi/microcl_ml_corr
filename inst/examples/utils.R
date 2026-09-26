@@ -537,3 +537,73 @@ arrange_with_legend <- function(panels, ncol = 2, nrow = NULL, legend_pos = "bot
     ggpubr::ggarrange(p_grid, leg, ncol = 1, heights = c(1, 0.08))
   }
 }
+
+# get_example_data -------------------------------------------------------------
+# Get path to an example dataset, downloading on demand from anonymous repository
+# if not already present locally.
+get_example_data <- function(filename,
+                             dest_dir = NULL,
+                             base_url = "https://anonymous.4open.science/r/microcl_ml_corr-3E14/inst/extdata/",
+                             force = FALSE) {
+  # 1. Check if the file is bundled inside inst/extdata in installed package
+  pkg_file <- system.file("extdata", filename, package = "microclCorr")
+  if (!force && nzchar(pkg_file) && file.exists(pkg_file)) {
+    return(normalizePath(pkg_file))
+  }
+
+  # Check local development paths relative to current working directory
+  candidates <- c(
+    file.path("inst", "extdata", filename),
+    file.path("..", "extdata", filename),
+    file.path("..", "..", "extdata", filename),
+    file.path("extdata", filename)
+  )
+  for (cand in candidates) {
+    if (!force && file.exists(cand)) {
+      return(normalizePath(cand))
+    }
+  }
+
+  # 2. Determine cache destination directory
+  if (is.null(dest_dir)) {
+    dest_dir <- tryCatch(
+      tools::R_user_dir("microclCorr", "data"),
+      error = function(e) file.path(tempdir(), "microclCorr_data")
+    )
+  }
+
+  target_file <- file.path(dest_dir, filename)
+  if (!force && file.exists(target_file) && file.size(target_file) > 0) {
+    return(normalizePath(target_file))
+  }
+
+  # 3. Download on demand from anonymous repository
+  if (!dir.exists(dest_dir)) {
+    dir.create(dest_dir, recursive = TRUE, showWarnings = FALSE)
+  }
+
+  clean_base <- sub("/+$", "", base_url)
+  download_url <- paste0(clean_base, "/", filename)
+
+  message("Downloading example dataset '", filename, "' from repository...")
+
+  err <- tryCatch({
+    utils::download.file(
+      url      = download_url,
+      destfile = target_file,
+      mode     = "wb",
+      quiet    = FALSE
+    )
+    NULL
+  }, error = function(e) e)
+
+  if (!is.null(err) || !file.exists(target_file) || file.size(target_file) == 0) {
+    if (file.exists(target_file)) unlink(target_file)
+    stop("Failed to download '", filename, "' from: ", download_url,
+         if (!is.null(err)) paste0("\nError: ", err$message) else "")
+  }
+
+  message("Dataset cached at: ", normalizePath(target_file))
+  normalizePath(target_file)
+}
+

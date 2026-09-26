@@ -18,8 +18,8 @@ library(ggplot2)
 library(ggpubr)
 
 SEED <- 123
-DATA_PATH_B <- system.file("extdata", "Beach_data_preprocessed.csv", package = "microclCorr")
-SPLITS_PATH_B <- system.file("extdata", "beach_splits.csv", package = "microclCorr")
+DATA_PATH_B <- get_example_data("Beach_data_preprocessed.csv")
+SPLITS_PATH_B <- get_example_data("beach_splits.csv")
 SCENARIO_DIR <- file.path(root, "inst", "examples", "scenario_4_beach_pooled")
 RESULTS_DIR <- file.path(SCENARIO_DIR, "results")
 SITE_COL_B <- "time_series_site"

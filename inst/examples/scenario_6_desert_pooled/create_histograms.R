@@ -19,8 +19,8 @@ library(ggpubr)
 
 SEED <- 123
 SITE_COL_D <- "site_id"
-DATA_PATH_D <- system.file("extdata", "desert_data_preprocessed.csv", package = "microclCorr")
-SPLITS_PATH_D <- system.file("extdata", "desert_splits.csv", package = "microclCorr")
+DATA_PATH_D <- get_example_data("desert_data_preprocessed.csv")
+SPLITS_PATH_D <- get_example_data("desert_splits.csv")
 SCENARIO_DIR <- file.path(root, "inst", "examples", "scenario_6_desert_pooled")
 RESULTS_DIR <- file.path(SCENARIO_DIR, "results")
 
