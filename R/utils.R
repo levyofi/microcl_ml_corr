@@ -43,6 +43,13 @@ check_tensorflow <- function() {
 #' @param scaler List with min/max from scaling
 #' @param feature_cols Character vector of feature column names
 #' @param path File path to save to (will create .rds file)
+#' @examples
+#' data(microclimate_sample)
+#' feature_cols <- c("TAREF", "RH", "VREF", "SOLR")
+#' rf <- train_rf(microclimate_sample[, feature_cols], microclimate_sample$residual, num_trees = 5, tune = FALSE)
+#' tmp <- tempfile(fileext = ".rds")
+#' save_correction_model(rf, scaler = NULL, feature_cols = feature_cols, path = tmp)
+#' unlink(tmp)
 #' @export
 save_correction_model <- function(model, scaler, feature_cols, path) {
   obj <- list(
@@ -59,6 +66,15 @@ save_correction_model <- function(model, scaler, feature_cols, path) {
 #'
 #' @param path File path to the .rds model
 #' @return List with model, scaler, feature_cols, model_type
+#' @examples
+#' data(microclimate_sample)
+#' feature_cols <- c("TAREF", "RH", "VREF", "SOLR")
+#' rf <- train_rf(microclimate_sample[, feature_cols], microclimate_sample$residual, num_trees = 5, tune = FALSE)
+#' tmp <- tempfile(fileext = ".rds")
+#' save_correction_model(rf, scaler = NULL, feature_cols = feature_cols, path = tmp)
+#' loaded <- load_correction_model(tmp)
+#' unlink(tmp)
+#' loaded$model_type
 #' @export
 load_correction_model <- function(path) {
   obj <- readRDS(path)
@@ -79,6 +95,13 @@ load_correction_model <- function(path) {
 #' and sets environment variables before reticulate binds to Python.
 #'
 #' @return Invisible file path to the Python executable, or NULL.
+#' @examples
+#' \dontrun{
+#' if (requireNamespace("reticulate", quietly = TRUE) &&
+#'     requireNamespace("tensorflow", quietly = TRUE)) {
+#'   setup_tensorflow()
+#' }
+#' }
 #' @export
 setup_tensorflow <- function() {
   if (!requireNamespace("reticulate", quietly = TRUE)) {

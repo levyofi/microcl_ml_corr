@@ -24,3 +24,12 @@ A compiled keras model
 Creates a Sequential keras model with stacked LSTM layers,
 dropout, and a single dense output for residual prediction.
 }
+\examples{
+\dontrun{
+if (requireNamespace("keras3", quietly = TRUE)) {
+  model <- build_lstm(input_shape = c(6, 5), n_units = 32, n_layers = 2)
+  summary(model)
+}
+}
+}
+

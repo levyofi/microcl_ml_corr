@@ -30,3 +30,9 @@ Character vector of feature column names
 Returns column names suitable for model training by excluding
 target, datetime, microhabitat, and other non-feature columns.
 }
+\examples{
+data(microclimate_sample)
+feature_cols <- get_feature_columns(microclimate_sample)
+print(feature_cols)
+}
+

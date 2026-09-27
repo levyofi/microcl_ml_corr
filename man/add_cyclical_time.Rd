@@ -19,3 +19,9 @@ The data.frame with added Hour_sin, Hour_cos (and optionally Month_sin, Month_co
 \description{
 Adds sine/cosine encoding of Hour (and optionally Month) to a data.frame.
 }
+\examples{
+data(microclimate_sample)
+df <- add_cyclical_time(microclimate_sample, datetime_col = "time", add_month = TRUE)
+head(df[, c("time", "Hour_sin", "Hour_cos", "Month_sin", "Month_cos")])
+}
+

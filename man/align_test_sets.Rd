@@ -30,3 +30,13 @@ Filtered test data.frame aligned to LSTM endpoints
 Filters the point-based test dataset to only include rows that were
 successfully processed as window endpoints by the LSTM windowing.
 }
+\examples{
+data(microclimate_sample)
+splits <- split_train_val_test(microclimate_sample, train_pct = 0.6, val_pct = 0.2, block_days = 2, seed = 42)
+scaled <- lstm_scaling(splits$train, splits$val, splits$test)
+prep <- lstm_specific_preprocessing(scaled$train, scaled$val, scaled$test,
+                                    window_size = 2, ts_names_col = "time_series_doc")
+aligned <- align_test_sets(splits$test, prep$test_dict, prep$index_info, "time_series_doc")
+nrow(aligned)
+}
+

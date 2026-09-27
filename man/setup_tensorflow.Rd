@@ -6,6 +6,19 @@
 \usage{
 setup_tensorflow()
 }
-\description{
-Setup Tensorflow environment
+\value{
+Invisible file path to the Python executable, or NULL.
 }
+\description{
+Finds or creates a Python environment with TensorFlow and Keras configured,
+and sets environment variables before reticulate binds to Python.
+}
+\examples{
+\dontrun{
+if (requireNamespace("reticulate", quietly = TRUE) &&
+    requireNamespace("tensorflow", quietly = TRUE)) {
+  setup_tensorflow()
+}
+}
+}
+

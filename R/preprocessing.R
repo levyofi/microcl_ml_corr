@@ -13,6 +13,13 @@
 #' @param microhabitat_col Name of the microhabitat column.
 #' @param datetime_col Name of the datetime column.
 #' @return A data.frame with parsed datetime and (optionally) one-hot encoded microhabitat.
+#' @examples
+#' data(microclimate_sample)
+#' tmp <- tempfile(fileext = ".csv")
+#' write.csv(microclimate_sample, tmp, row.names = TRUE)
+#' loaded <- load_prepared_csv_data(tmp, datetime_format = "%d/%m/%Y %H:%M", includes_index = TRUE)
+#' head(loaded[, c("time", "microhabitat", "predicted", "residual")])
+#' unlink(tmp)
 #' @export
 load_prepared_csv_data <- function(path,
                                    is_continuous_microhabitat = FALSE,
@@ -64,6 +71,10 @@ load_prepared_csv_data <- function(path,
 #' @param microhabitat_col Microhabitat column name
 #' @param prediction_col Prediction column name
 #' @return Character vector of feature column names
+#' @examples
+#' data(microclimate_sample)
+#' feature_cols <- get_feature_columns(microclimate_sample)
+#' print(feature_cols)
 #' @export
 get_feature_columns <- function(df,
                                 avoid_cols = .default_cols$avoid,
@@ -84,6 +95,10 @@ get_feature_columns <- function(df,
 #' @param datetime_col Name of the datetime column
 #' @param add_month Logical. Whether to also add month cyclical features.
 #' @return The data.frame with added Hour_sin, Hour_cos (and optionally Month_sin, Month_cos).
+#' @examples
+#' data(microclimate_sample)
+#' df <- add_cyclical_time(microclimate_sample, datetime_col = "time", add_month = TRUE)
+#' head(df[, c("time", "Hour_sin", "Hour_cos", "Month_sin", "Month_cos")])
 #' @export
 add_cyclical_time <- function(df, datetime_col = "time", add_month = FALSE) {
   hours <- as.numeric(format(df[[datetime_col]], "%H"))
@@ -549,6 +564,14 @@ lstm_specific_preprocessing <- function(train, val, test, window_size,
 #' @param site_name_col Site name column
 #' @param datetime_col Datetime column
 #' @return Filtered test data.frame aligned to LSTM endpoints
+#' @examples
+#' data(microclimate_sample)
+#' splits <- split_train_val_test(microclimate_sample, train_pct = 0.6, val_pct = 0.2, block_days = 2, seed = 42)
+#' scaled <- lstm_scaling(splits$train, splits$val, splits$test)
+#' prep <- lstm_specific_preprocessing(scaled$train, scaled$val, scaled$test,
+#'                                     window_size = 2, ts_names_col = "time_series_doc")
+#' aligned <- align_test_sets(splits$test, prep$test_dict, prep$index_info, "time_series_doc")
+#' nrow(aligned)
 #' @export
 align_test_sets <- function(test_dataset, lstm_test_dict, ts_index_info,
                             site_name_col, datetime_col = "time") {

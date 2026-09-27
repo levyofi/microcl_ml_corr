@@ -18,3 +18,12 @@ save_correction_model(model, scaler, feature_cols, path)
 \description{
 Save a correction model to disk
 }
+\examples{
+data(microclimate_sample)
+feature_cols <- c("TAREF", "RH", "VREF", "SOLR")
+rf <- train_rf(microclimate_sample[, feature_cols], microclimate_sample$residual, num_trees = 5, tune = FALSE)
+tmp <- tempfile(fileext = ".rds")
+save_correction_model(rf, scaler = NULL, feature_cols = feature_cols, path = tmp)
+unlink(tmp)
+}
+

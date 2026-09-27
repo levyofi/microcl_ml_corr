@@ -12,6 +12,13 @@
 #' @param dropout Dropout rate (0 to 1)
 #' @param lr Learning rate (NULL to use Adam default)
 #' @return A compiled keras model
+#' @examples
+#' \dontrun{
+#' if (requireNamespace("keras3", quietly = TRUE)) {
+#'   model <- build_lstm(input_shape = c(6, 5), n_units = 32, n_layers = 2)
+#'   summary(model)
+#' }
+#' }
 #' @export
 build_lstm <- function(input_shape,
                        n_units = 64,
@@ -155,6 +162,24 @@ train_lstm <- function(train_X, train_y,
 #' @param patience Early stopping patience
 #' @param seed Random seed
 #' @return List with best_model and best_params
+#' @examples
+#' \dontrun{
+#' if (requireNamespace("keras3", quietly = TRUE) &&
+#'     requireNamespace("tensorflow", quietly = TRUE)) {
+#'   data(microclimate_sample)
+#'   microclimate_sample$time <- as.POSIXct(microclimate_sample$time, format = "%d/%m/%Y %H:%M", tz = "UTC")
+#'   splits <- split_train_val_test(microclimate_sample, train_pct = 0.6, val_pct = 0.2, block_days = 2, seed = 42)
+#'   scaled <- lstm_scaling(splits$train, splits$val, splits$test)
+#'   lstm_data <- lstm_specific_preprocessing(scaled$train, scaled$val, scaled$test,
+#'                                           window_size = 2, ts_names_col = "time_series_doc")
+#'   hpo <- lstm_hypertuning(
+#'     train_X = lstm_data$train_dict$X, train_y = lstm_data$train_dict$y,
+#'     val_X = lstm_data$val_dict$X, val_y = lstm_data$val_dict$y,
+#'     n_trials = 2, epochs = 2
+#'   )
+#'   print(hpo$params)
+#' }
+#' }
 #' @export
 lstm_hypertuning <- function(train_X, train_y, val_X, val_y,
                              n_trials = 5,

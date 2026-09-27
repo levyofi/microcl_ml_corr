@@ -53,3 +53,23 @@ List with best_model and best_params
 \description{
 Performs a simple random search over LSTM hyperparameters.
 }
+\examples{
+\dontrun{
+if (requireNamespace("keras3", quietly = TRUE) &&
+    requireNamespace("tensorflow", quietly = TRUE)) {
+  data(microclimate_sample)
+  microclimate_sample$time <- as.POSIXct(microclimate_sample$time, format = "\%d/\%m/\%Y \%H:\%M", tz = "UTC")
+  splits <- split_train_val_test(microclimate_sample, train_pct = 0.6, val_pct = 0.2, block_days = 2, seed = 42)
+  scaled <- lstm_scaling(splits$train, splits$val, splits$test)
+  lstm_data <- lstm_specific_preprocessing(scaled$train, scaled$val, scaled$test,
+                                          window_size = 2, ts_names_col = "time_series_doc")
+  hpo <- lstm_hypertuning(
+    train_X = lstm_data$train_dict$X, train_y = lstm_data$train_dict$y,
+    val_X = lstm_data$val_dict$X, val_y = lstm_data$val_dict$y,
+    n_trials = 2, epochs = 2
+  )
+  print(hpo$params)
+}
+}
+}
+
