@@ -64,13 +64,30 @@ Each scenario folder contains:
 
 ---
 
-## How to run a scenario
+## Prerequisites for LSTM Scenarios
 
-Open any `run_scenario_N.R` file in RStudio and click **Source**, or run from
-the repository root:
+Scenarios 1 through 7 compare Random Forest with an LSTM neural network.
+Running LSTM models requires Python with TensorFlow and Keras, as well as the R packages `reticulate`, `tensorflow`, and `keras3`.
+
+It is not good practice to install software packages automatically without the user's explicit action. Before running any LSTM scenario for the first time, install and configure the required environment by running:
 
 ```r
-source("inst/examples/scenario_1_valley_single_logger/run_scenario_1.R")
+library(microclCorr)
+setup_tensorflow()
+```
+
+`setup_tensorflow()` detects an existing Python environment with TensorFlow or installs the required packages into a dedicated virtual environment (`microcl_env`).
+
+*(Note: Preprocessing examples and Scenario 8 use Random Forest only and do not require TensorFlow.)*
+
+---
+
+## How to run a scenario
+
+Open any `run_scenario_N.R` file in RStudio and click **Source**, or run from your R session:
+
+```r
+source(system.file("examples", "scenario_1_valley_single_logger", "run_scenario_1.R", package = "microclCorr"))
 ```
 
 All input data is bundled with the package and located automatically via

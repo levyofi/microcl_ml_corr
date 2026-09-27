@@ -9,6 +9,15 @@
 # Compare with: Scenario 3 (single logger), Scenario 7 (per-region models)
 # Note: the pooled model uses far more training data than Scenario 3, so
 #       the performance difference is not purely due to spatial diversity.
+#
+# Prerequisites:
+#   This scenario trains and evaluates an LSTM neural network alongside
+#   Random Forest. Running LSTM models requires Python with TensorFlow and Keras.
+#   It is not good practice to install software packages automatically without
+#   explicit user instruction. Before running this scenario for the first time,
+#   please configure and install the required environment by running:
+#       library(microclCorr)
+#       setup_tensorflow()
 # =============================================================================
 
 source(system.file("examples", "examples_utility_functions.R", package = "microclCorr"))

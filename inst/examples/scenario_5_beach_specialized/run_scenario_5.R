@@ -10,6 +10,15 @@
 # local conditions (wind patterns, sea proximity, terrain).
 #
 # Compare with: Scenario 2 (single logger), Scenario 4 (all sites pooled)
+#
+# Prerequisites:
+#   This scenario trains and evaluates an LSTM neural network alongside
+#   Random Forest. Running LSTM models requires Python with TensorFlow and Keras.
+#   It is not good practice to install software packages automatically without
+#   explicit user instruction. Before running this scenario for the first time,
+#   please configure and install the required environment by running:
+#       library(microclCorr)
+#       setup_tensorflow()
 # =============================================================================
 
 source(system.file("examples", "examples_utility_functions.R", package = "microclCorr"))

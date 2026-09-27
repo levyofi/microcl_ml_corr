@@ -7,7 +7,23 @@ and tested on each individual site, with results aggregated by region and microh
 ~448–1,570 train rows per logger. The pooled model uses far more data, so gains are
 volume-confounded.
 
+## Prerequisites
+
+This scenario trains and evaluates an LSTM neural network in addition to Random Forest.
+Running LSTM models requires Python with TensorFlow and Keras, as well as the R packages `reticulate`, `tensorflow`, and `keras3`.
+
+It is not good practice to install software packages automatically without explicit user instruction. Before running this scenario for the first time, install and configure the required environment by running:
+
+```r
+library(microclCorr)
+setup_tensorflow()
+```
+
+`setup_tensorflow()` detects an existing Python environment with TensorFlow or installs the required packages into a dedicated virtual environment (`microcl_env`).
+
 ## Run
+
+Once TensorFlow is configured, run the scenario:
 
 ```r
 source(system.file("examples", "scenario_6_desert_pooled", "run_scenario_6.R", package = "microclCorr"))

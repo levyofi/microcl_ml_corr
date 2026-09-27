@@ -7,7 +7,23 @@ and tested on the logger sites within each location.
 - Scenario 2 (single logger, Ashkelon 15 m): RF RMSE = 3.06 °C, 62.6%, ~1,405 train rows.
 - Scenario 4 (pooled, all 7 loggers): RF avg RMSE = 0.875 °C, 89.7%, 13,988 train rows.
 
+## Prerequisites
+
+This scenario trains and evaluates an LSTM neural network in addition to Random Forest.
+Running LSTM models requires Python with TensorFlow and Keras, as well as the R packages `reticulate`, `tensorflow`, and `keras3`.
+
+It is not good practice to install software packages automatically without explicit user instruction. Before running this scenario for the first time, install and configure the required environment by running:
+
+```r
+library(microclCorr)
+setup_tensorflow()
+```
+
+`setup_tensorflow()` detects an existing Python environment with TensorFlow or installs the required packages into a dedicated virtual environment (`microcl_env`).
+
 ## Run
+
+Once TensorFlow is configured, run the scenario:
 
 ```r
 source(system.file("examples", "scenario_5_beach_specialized", "run_scenario_5.R", package = "microclCorr"))

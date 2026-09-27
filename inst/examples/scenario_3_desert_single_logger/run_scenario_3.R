@@ -29,6 +29,15 @@
 #
 # Want to know how many days of data you need? See find_min_training_days() in examples_utility_functions.R.
 # Compare with: Scenario 6 (pooled, all 48 desert loggers combined)
+#
+# Prerequisites:
+#   This scenario trains and evaluates an LSTM neural network alongside
+#   Random Forest. Running LSTM models requires Python with TensorFlow and Keras.
+#   It is not good practice to install software packages automatically without
+#   explicit user instruction. Before running this scenario for the first time,
+#   please configure and install the required environment by running:
+#       library(microclCorr)
+#       setup_tensorflow()
 # =============================================================================
 
 source(system.file("examples", "examples_utility_functions.R", package = "microclCorr"))
