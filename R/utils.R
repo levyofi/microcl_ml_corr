@@ -39,10 +39,17 @@ check_tensorflow <- function() {
 
 #' Save a correction model to disk
 #'
+#' Saves a trained correction model (Random Forest or LSTM) and its metadata
+#' to a single \code{.rds} file. Random Forest models are serialized natively.
+#' LSTM (Keras) models are saved to a temporary file, serialized as raw binary
+#' bytes, and embedded directly inside the \code{.rds} file, avoiding dead
+#' Python pointers and providing a self-contained bundle across R sessions.
+#'
 #' @param model Trained model (ranger or keras)
 #' @param scaler List with min/max from scaling
 #' @param feature_cols Character vector of feature column names
 #' @param path File path to save to (will create .rds file)
+#' @return Invisible file path to the saved model file.
 #' @examples
 #' data(microclimate_sample)
 #' feature_cols <- c("TAREF", "RH", "VREF", "SOLR")
@@ -52,17 +59,35 @@ check_tensorflow <- function() {
 #' unlink(tmp)
 #' @export
 save_correction_model <- function(model, scaler, feature_cols, path) {
+  is_rf      <- inherits(model, "ranger")
+  model_type <- if (is_rf) "rf" else "lstm"
+
+  keras_bytes <- NULL
+  if (!is_rf) {
+    check_keras3()
+    keras_tmp <- tempfile(fileext = ".keras")
+    keras3::save_model(model, keras_tmp)
+    keras_bytes <- readBin(keras_tmp, "raw", file.info(keras_tmp)$size)
+    unlink(keras_tmp)
+    model <- NULL # don't embed the Python pointer
+  }
+
   obj <- list(
     model        = model,
+    keras_bytes  = keras_bytes,
     scaler       = scaler,
     feature_cols = feature_cols,
-    model_type   = if (inherits(model, "ranger")) "rf" else "lstm"
+    model_type   = model_type
   )
   saveRDS(obj, path)
   invisible(path)
 }
 
 #' Load a correction model from disk
+#'
+#' Loads a model bundle previously saved with \code{\link{save_correction_model}}.
+#' Supports both Random Forest models and LSTM models serialized as raw binary
+#' bytes or sidecar \code{.keras} files.
 #'
 #' @param path File path to the .rds model
 #' @return List with model, scaler, feature_cols, model_type
@@ -78,12 +103,24 @@ save_correction_model <- function(model, scaler, feature_cols, path) {
 #' @export
 load_correction_model <- function(path) {
   obj <- readRDS(path)
-  # If it's an LSTM, load the .keras file
-  if (obj$model_type == "lstm" || (is.character(obj$model) && length(obj$model) > 0)) {
+  if (identical(obj$model_type, "lstm") || (!is.null(obj$keras_bytes)) ||
+      (is.character(obj$model) && length(obj$model) > 0)) {
+    check_keras3()
     keras_path <- sub("\\.rds$", ".keras", path)
     if (file.exists(keras_path)) {
-      check_keras3()
       obj$model <- keras3::load_model(keras_path)
+    } else if (!is.null(obj$keras_bytes)) {
+      keras_tmp <- tempfile(fileext = ".keras")
+      writeBin(obj$keras_bytes, keras_tmp)
+      obj$model <- keras3::load_model(keras_tmp)
+      unlink(keras_tmp)
+    } else {
+      # Fallback for models saved with serialize_keras_object
+      tryCatch({
+        obj$model <- keras3::deserialize_keras_object(obj$model)
+      }, error = function(e) {
+        stop("Failed to load LSTM model. Dead python pointer and no side-by-side .keras file or embedded model bytes found.", call. = FALSE)
+      })
     }
   }
   obj

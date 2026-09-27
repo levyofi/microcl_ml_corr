@@ -13,7 +13,9 @@ load_correction_model(path)
 List with model, scaler, feature_cols, model_type
 }
 \description{
-Load a correction model from disk
+Loads a model bundle previously saved with \code{\link{save_correction_model}}.
+Supports both Random Forest models and LSTM models serialized as raw binary
+bytes or sidecar \code{.keras} files.
 }
 \examples{
 data(microclimate_sample)

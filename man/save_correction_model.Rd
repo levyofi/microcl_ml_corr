@@ -15,8 +15,15 @@ save_correction_model(model, scaler, feature_cols, path)
 
 \item{path}{File path to save to (will create .rds file)}
 }
+\value{
+Invisible file path to the saved model file.
+}
 \description{
-Save a correction model to disk
+Saves a trained correction model (Random Forest or LSTM) and its metadata
+to a single \code{.rds} file. Random Forest models are serialized natively.
+LSTM (Keras) models are saved to a temporary file, serialized as raw binary
+bytes, and embedded directly inside the \code{.rds} file, avoiding dead
+Python pointers and providing a self-contained bundle across R sessions.
 }
 \examples{
 data(microclimate_sample)
