@@ -54,16 +54,8 @@ check_keras3 <- function(check_backend = TRUE) {
 
     if (!has_backend) {
       stop(
-        "A Python environment with 'keras' or 'tensorflow' is required for LSTM operations, but none was found.\n",
-        "Automatic background package installation has been blocked.\n\n",
-        "To configure your Python environment manually, please do one of the following:\n",
-        "  1. If you have an existing Python environment with TensorFlow/Keras:\n",
-        "     Sys.setenv(RETICULATE_PYTHON = '/path/to/python')\n",
-        "     or in R: reticulate::use_condaenv('your_env')\n",
-        "     or in R: reticulate::use_virtualenv('your_env')\n\n",
-        "  2. To install TensorFlow and Keras into a Python environment manually:\n",
-        "     reticulate::py_install(c('tensorflow', 'keras'))\n",
-        "     or in your shell terminal: pip install tensorflow keras\n",
+        "A Python environment with 'keras' or 'tensorflow' is required for LSTM operations, but none is currently configured.\n",
+        "Please run setup_tensorflow() first to configure your TensorFlow environment.",
         call. = FALSE
       )
     }
