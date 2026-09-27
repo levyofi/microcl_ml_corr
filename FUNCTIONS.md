@@ -21,6 +21,29 @@ df <- microclimate_sample
 
 ---
 
+## Environment Setup
+
+### `setup_tensorflow()`
+
+Finds or creates a Python virtual environment with TensorFlow and Keras configured, and sets environment variables (`RETICULATE_PYTHON`, `KERAS_HOME`) before `reticulate` binds to Python.
+
+**Parameters**
+
+None.
+
+**Returns** Invisible file path to the Python executable, or `NULL`.
+
+**Example**
+
+```r
+if (requireNamespace("reticulate", quietly = TRUE) &&
+    requireNamespace("tensorflow", quietly = TRUE)) {
+  py_path <- setup_tensorflow()
+}
+```
+
+---
+
 ## Data Loading
 
 ### `get_example_data()`
@@ -499,6 +522,49 @@ if (requireNamespace("keras3", quietly = TRUE)) {
     patience   = 10,
     seed       = 42
   )
+}
+```
+
+---
+
+### `lstm_hypertuning()`
+
+Performs a random search over LSTM hyperparameters (`n_units`, `n_layers`, `dropout`, `lr`) using validation loss for model selection. Requires the optional `keras3` and `tensorflow` packages.
+
+**Parameters**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `train_X` | 3-D array | — | `(n_windows, window_size, n_features)` |
+| `train_y` | numeric | — | Training targets |
+| `val_X` | 3-D array | — | Validation features |
+| `val_y` | numeric | — | Validation targets |
+| `n_trials` | integer | `5` | Number of random hyperparameter combinations to try |
+| `units_range` | integer vector | `c(32, 512)` | Min/max for `n_units` (searched in steps of 32) |
+| `layers_range` | integer vector | `c(1, 3)` | Min/max for stacked LSTM layers |
+| `dropout_range` | numeric vector | `c(0, 0.3)` | Min/max for dropout rate |
+| `lr_range` | numeric vector | `c(1e-4, 0.01)` | Min/max for Adam learning rate (log-uniform) |
+| `epochs` | integer | `100` | Max epochs per trial |
+| `batch_size` | integer | `32` | Batch size |
+| `patience` | integer | `10` | Early stopping patience |
+| `seed` | integer | `123` | Random seed |
+
+**Returns** List with `model` (best fitted Keras model), `params` (list of best hyperparameters), and `val_mse`.
+
+**Example**
+
+```r
+if (requireNamespace("keras3", quietly = TRUE) &&
+    requireNamespace("tensorflow", quietly = TRUE)) {
+  hpo <- lstm_hypertuning(
+    train_X  = lstm_data$train_dict$X,
+    train_y  = lstm_data$train_dict$y,
+    val_X    = lstm_data$val_dict$X,
+    val_y    = lstm_data$val_dict$y,
+    n_trials = 2,
+    epochs   = 2
+  )
+  print(hpo$params)
 }
 ```
 
