@@ -14,28 +14,19 @@ library(microclCorr)
 
 # ── 1. Load NicheMapR predictions (one file for all loggers) ───────────────────
 
-script_dir <- tryCatch({
-  cmd_args <- commandArgs(trailingOnly = FALSE)
-  file_arg <- grep("^--file=", cmd_args, value = TRUE)
-  if (length(file_arg) > 0) {
-    dirname(normalizePath(sub("^--file=", "", file_arg[1])))
-  } else {
-    pkg_dir <- system.file("examples", "preprocessing_examples", package = "microclCorr")
-    if (nzchar(pkg_dir) && dir.exists(pkg_dir)) pkg_dir else getwd()
-  }
-}, error = function(e) {
-  pkg_dir <- system.file("examples", "preprocessing_examples", package = "microclCorr")
-  if (nzchar(pkg_dir) && dir.exists(pkg_dir)) pkg_dir else getwd()
-})
+data_dir <- system.file("examples", "preprocessing_examples", "data", package = "microclCorr")
+if (!nzchar(data_dir) || !dir.exists(data_dir)) {
+  data_dir <- if (dir.exists("data")) "data" else file.path("inst", "examples", "preprocessing_examples", "data")
+}
 
-nm_path <- file.path(script_dir, "data", "example_nichemapr_multiple.csv")
+nm_path <- file.path(data_dir, "example_nichemapr_multiple.csv")
 nm <- read.csv(nm_path)
 nm$time <- as.POSIXct(nm$time, tz = "UTC")
 cat("NicheMapR rows:", nrow(nm), "| sites:", length(unique(nm$site_id)), "\n")
 
 # ── 2. Load and process each logger CSV ────────────────────────────────────────
 
-logger_dir   <- file.path(script_dir, "data", "example_loggers")
+logger_dir   <- file.path(data_dir, "example_loggers")
 logger_files <- list.files(logger_dir, pattern = "\\.csv$", full.names = TRUE)
 cat("Found", length(logger_files), "logger files\n")
 
@@ -70,10 +61,7 @@ cat("Total pooled rows:", nrow(aligned_pooled),
 
 # ── 4. Save pooled file ─────────────────────────────────────────────────────────
 
-out_dir <- file.path(script_dir, "data")
-if (!dir.exists(out_dir) || file.access(out_dir, 2) != 0) {
-  out_dir <- getwd()
-}
+out_dir  <- if (dir.exists(data_dir) && file.access(data_dir, 2) == 0) data_dir else getwd()
 out_path <- file.path(out_dir, "aligned_pooled.csv")
 write.csv(aligned_pooled, out_path, row.names = FALSE)
 cat("Pooled CSV saved to:", out_path, "\n")

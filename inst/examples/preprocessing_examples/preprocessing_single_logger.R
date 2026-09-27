@@ -14,22 +14,13 @@ library(microclCorr)
 
 # ── 1. Load the two raw files ──────────────────────────────────────────────────
 
-script_dir <- tryCatch({
-  cmd_args <- commandArgs(trailingOnly = FALSE)
-  file_arg <- grep("^--file=", cmd_args, value = TRUE)
-  if (length(file_arg) > 0) {
-    dirname(normalizePath(sub("^--file=", "", file_arg[1])))
-  } else {
-    pkg_dir <- system.file("examples", "preprocessing_examples", package = "microclCorr")
-    if (nzchar(pkg_dir) && dir.exists(pkg_dir)) pkg_dir else getwd()
-  }
-}, error = function(e) {
-  pkg_dir <- system.file("examples", "preprocessing_examples", package = "microclCorr")
-  if (nzchar(pkg_dir) && dir.exists(pkg_dir)) pkg_dir else getwd()
-})
+data_dir <- system.file("examples", "preprocessing_examples", "data", package = "microclCorr")
+if (!nzchar(data_dir) || !dir.exists(data_dir)) {
+  data_dir <- if (dir.exists("data")) "data" else file.path("inst", "examples", "preprocessing_examples", "data")
+}
 
-logger_path <- file.path(script_dir, "data", "example_logger_single.csv")
-nm_path     <- file.path(script_dir, "data", "example_nichemapr_single.csv")
+logger_path <- file.path(data_dir, "example_logger_single.csv")
+nm_path     <- file.path(data_dir, "example_nichemapr_single.csv")
 
 logger <- read.csv(logger_path)
 nm     <- read.csv(nm_path)
@@ -57,10 +48,7 @@ print(summary(aligned$residual))
 
 # ── 5. Save aligned file ────────────────────────────────────────────────────────
 
-out_dir <- file.path(script_dir, "data")
-if (!dir.exists(out_dir) || file.access(out_dir, 2) != 0) {
-  out_dir <- getwd()
-}
+out_dir  <- if (dir.exists(data_dir) && file.access(data_dir, 2) == 0) data_dir else getwd()
 out_path <- file.path(out_dir, "aligned_single.csv")
 write.csv(aligned, out_path, row.names = FALSE)
 cat("Aligned CSV saved to:", out_path, "\n")
