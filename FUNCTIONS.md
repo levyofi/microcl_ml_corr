@@ -1,6 +1,6 @@
 # microclCorr — Function Reference
 
-All examples below were verified against package version 0.1.0.
+All examples below are runnable and verified against package version 0.1.0 using the bundled dataset `data(microclimate_sample)` or on-demand datasets via `get_example_data()`.
 
 ---
 
@@ -8,28 +8,15 @@ All examples below were verified against package version 0.1.0.
 
 ```r
 library(microclCorr)
-library(ranger)   # for RF examples
+library(ranger)   # for Random Forest examples
 
-set.seed(42)
-n <- 1500         # hourly observations per site (~62 days → 8 blocks of 7 d)
-times <- seq(as.POSIXct("2023-01-01", tz = "UTC"), by = "hour", length.out = n)
+# Option 1: Bundled 7-day microclimate sample (instant, no external files required)
+data(microclimate_sample)
+df <- microclimate_sample
 
-make_site <- function(name, mu_res = 0, seed = 1) {
-  set.seed(seed)
-  data.frame(
-    time            = times,
-    residual        = rnorm(n, mu_res, 1.5),   # measured − NicheMapR
-    predicted       = rnorm(n, 22, 4),          # NicheMapR output
-    microhabitat    = sample(c("open", "shade"), n, replace = TRUE),
-    temp_air        = rnorm(n, 25, 5),
-    solar           = pmax(0, rnorm(n, 400, 200)),
-    time_series_doc = name,
-    stringsAsFactors = FALSE
-  )
-}
-
-df <- rbind(make_site("site_A", 0, 1),
-            make_site("site_B", 2, 2))
+# Option 2: Full multi-week field dataset retrieved on demand
+# csv_path <- get_example_data("Harod_dataset.csv")
+# df <- load_prepared_csv_data(csv_path, datetime_format = "%d/%m/%Y %H:%M")
 ```
 
 ---
@@ -51,11 +38,15 @@ Retrieves the local path to an example dataset. If the dataset exists locally in
 
 **Returns**: `character` scalar containing the absolute path to the local CSV dataset.
 
+**Example**
+
 ```r
-# Download and retrieve path on demand:
-data_path <- get_example_data("Harod_dataset.csv")
-df <- read.csv(data_path)
+# Retrieve local or cached example dataset:
+csv_path <- get_example_data("Harod_dataset.csv")
+file.exists(csv_path)  # TRUE
 ```
+
+---
 
 ### `load_prepared_csv_data()`
 
@@ -77,22 +68,17 @@ Reads a pre-aligned CSV, parses the datetime column, and one-hot encodes a categ
 **Example**
 
 ```r
-tmp <- tempfile(fileext = ".csv")
-write.csv(df[df$time_series_doc == "site_A",
-             c("time", "residual", "predicted",
-               "microhabitat", "temp_air", "solar", "time_series_doc")],
-          tmp)
-
-site_a <- load_prepared_csv_data(
-  tmp,
+# Load real-world field logger data directly
+csv_path <- get_example_data("Harod_dataset.csv")
+df_harod <- load_prepared_csv_data(
+  csv_path,
   is_continuous_microhabitat = FALSE,
-  datetime_format = "%Y-%m-%d %H:%M:%S",
+  datetime_format = "%d/%m/%Y %H:%M",
   includes_index  = TRUE
 )
 
-# New columns: microhabitat_open, microhabitat_shade, microhabitat
-names(site_a)
-nrow(site_a)   # 1500
+# New one-hot columns: microhabitat_sun, microhabitat_shade, microhabitat_air
+head(df_harod[, c("time", "microhabitat", "predicted", "residual")])
 ```
 
 ---
@@ -116,8 +102,10 @@ Adds sine/cosine encodings of hour-of-day (and optionally month-of-year) so that
 **Example**
 
 ```r
-df <- add_cyclical_time(df, datetime_col = "time", add_month = TRUE)
+data(microclimate_sample)
+df <- add_cyclical_time(microclimate_sample, datetime_col = "time", add_month = TRUE)
 # Added: Hour_sin, Hour_cos, Month_sin, Month_cos
+names(df)
 ```
 
 ---
@@ -141,9 +129,12 @@ Returns the column names suitable for model input by excluding target, datetime,
 **Example**
 
 ```r
-feat_cols <- get_feature_columns(df)
-# "temp_air"  "solar"  "Hour_sin"  "Hour_cos"  "Month_sin"  "Month_cos"
-# (one-hot microhabitat columns appear here if present)
+data(microclimate_sample)
+feat_cols <- get_feature_columns(microclimate_sample)
+print(feat_cols)
+# [1] "sun_temp"   "shade_temp" "air_temp"   "TAREF"      "RH"
+# [6] "VREF"       "SOLR"       "TSKYC"      "DEW"        "Hour_sin"
+# [11] "Hour_cos"
 ```
 
 ---
@@ -178,16 +169,12 @@ Splits a dataset into train / validation / test using shuffled N-day blocks. Blo
 **Example**
 
 ```r
-splits <- split_train_val_test(df, block_days = 7, seed = 42)
-# train: 2328 rows   val: 336 rows   test: 336 rows  (total = 3000)
-
-# Reproduce a specific Python-matched split
-splits_fixed <- split_train_val_test(
-  df, block_days = 7,
-  train_blocks = c(0, 1, 2, 3, 4, 7),
-  val_blocks   = c(5),
-  test_blocks  = c(6)
-)
+data(microclimate_sample)
+# Split 7 days of data into 2-day blocks: 75% train, 12.5% val, 12.5% test
+splits <- split_train_val_test(microclimate_sample, block_days = 2, seed = 42)
+cat(sprintf("Train: %d | Val: %d | Test: %d (total = %d)\n",
+            nrow(splits$train), nrow(splits$val), nrow(splits$test), nrow(microclimate_sample)))
+# Train: 216 | Val: 144 | Test: 144 (total = 504)
 ```
 
 ---
@@ -211,20 +198,24 @@ Like `split_train_val_test()` but performs the block-shuffle independently per s
 **Returns** List with `train`, `val`, `test` data.frames. Rows are disjoint and `nrow(train) + nrow(val) + nrow(test) == nrow(data)`.
 
 **Notes**
-- Requires enough blocks per site for at least one validation block: `floor(n_blocks_per_site × val_pct) ≥ 1`. With `block_days = 7` and `val_pct = 0.125` this needs ≥ 8 blocks (≥ 56 days) per site. Use `block_days = 3` for shorter series.
-- Sites whose block count is too small will have no validation or test rows.
+- Requires enough blocks per site for at least one validation block: `floor(n_blocks_per_site × val_pct) ≥ 1`. With `block_days = 7` and `val_pct = 0.125` this needs ≥ 8 blocks (≥ 56 days) per site. Use smaller `block_days` (e.g. 1 or 2) for shorter series.
 
 **Example**
 
 ```r
-# df has 2 sites × 1500 rows → 8 blocks of 7 days per site
+data(microclimate_sample)
+# 3 microhabitats × 7 days (1-day blocks per logger)
 splits_s <- stratified_split_train_val_test(
-  df,
+  microclimate_sample,
   stratify_col = "time_series_doc",
-  block_days   = 7,
+  train_pct    = 0.6,
+  val_pct      = 0.2,
+  block_days   = 1,
   seed         = 42
 )
-# train: 2004   val: 324   test: 672   (total = 3000)
+cat(sprintf("Train: %d | Val: %d | Test: %d (total = %d)\n",
+            nrow(splits_s$train), nrow(splits_s$val), nrow(splits_s$test), nrow(microclimate_sample)))
+# Train: 288 | Val: 72 | Test: 144 (total = 504)
 ```
 
 ---
@@ -252,15 +243,13 @@ Applies MinMax scaling to feature columns. The scaler is **fit only on training 
 **Example**
 
 ```r
+data(microclimate_sample)
+splits <- split_train_val_test(microclimate_sample, block_days = 2, seed = 42)
 scaled <- lstm_scaling(splits$train, splits$val, splits$test)
-# scaled$scaler$cols  →  c("temp_air", "solar", "Hour_sin", ...)
 
-# Manual scale of new data at inference
-new_data <- splits$test[1:5, ]
-for (col in scaled$scaler$cols) {
-  new_data[[col]] <- (new_data[[col]] - scaled$scaler$min[col]) /
-                      scaled$scaler$range[col]
-}
+# Scaler attributes:
+scaled$scaler$cols
+# c("sun_temp", "shade_temp", "air_temp", "TAREF", "RH", ...)
 ```
 
 ---
@@ -289,17 +278,23 @@ Reshapes a time series into overlapping sliding windows for LSTM input. Windows 
 **Example**
 
 ```r
-site_a_train <- splits$train[splits$train$time_series_doc == "site_A", ]
+data(microclimate_sample)
+feat_cols <- get_feature_columns(microclimate_sample)
+splits <- split_train_val_test(microclimate_sample, block_days = 2, seed = 42)
+scaled <- lstm_scaling(splits$train, splits$val, splits$test)
+
+# Create 6-hour sliding windows for one logger's training subset
+sun_train <- scaled$train[scaled$train$time_series_doc == "harod2_sun.csv", ]
 
 win <- make_windows(
-  X_mat        = as.matrix(site_a_train[, feat_cols]),
-  y_vec        = site_a_train$residual,
-  base_pred_vec = site_a_train$predicted,
-  datetime_vec = site_a_train$time,
-  window_size  = 6,
+  X_mat         = as.matrix(sun_train[, feat_cols]),
+  y_vec         = sun_train$residual,
+  base_pred_vec = sun_train$predicted,
+  datetime_vec  = sun_train$time,
+  window_size   = 6,
   max_gap_hours = 1
 )
-dim(win$X)        # (n_windows, 6, 6)
+dim(win$X)        # (n_windows, 6, n_features)
 length(win$y)     # n_windows
 ```
 
@@ -326,13 +321,17 @@ Runs `make_windows()` for every site in all three splits and concatenates the re
 **Example**
 
 ```r
+data(microclimate_sample)
+splits <- split_train_val_test(microclimate_sample, block_days = 2, seed = 42)
+scaled <- lstm_scaling(splits$train, splits$val, splits$test)
+
 lstm_data <- lstm_specific_preprocessing(
   scaled$train, scaled$val, scaled$test,
   window_size  = 6,
   ts_names_col = "time_series_doc"
 )
-# lstm_data$train_dict$X   dim: (n_train_windows, 6, 6)
-# lstm_data$index_info$datasets   →  c("site_A", "site_B")
+dim(lstm_data$train_dict$X)        # (186, 6, 11)
+lstm_data$index_info$datasets      # c("harod2_air.csv", "harod2_shd.csv", "harod2_sun.csv")
 ```
 
 ---
@@ -356,18 +355,23 @@ Filters the point-based test data.frame to keep only the rows that correspond to
 **Example**
 
 ```r
+data(microclimate_sample)
+splits <- split_train_val_test(microclimate_sample, block_days = 2, seed = 42)
+scaled <- lstm_scaling(splits$train, splits$val, splits$test)
+
 lstm_data <- lstm_specific_preprocessing(
   scaled$train, scaled$val, scaled$test,
   window_size = 6, ts_names_col = "time_series_doc"
 )
 
 rf_test_aligned <- align_test_sets(
-  test_dataset  = splits$test,
+  test_dataset   = splits$test,
   lstm_test_dict = lstm_data$test_dict,
   ts_index_info  = lstm_data$index_info,
   site_name_col  = "time_series_doc"
 )
-# nrow(rf_test_aligned) == length(lstm_data$test_dict$y)
+# Exact 1-to-1 row alignment:
+nrow(rf_test_aligned) == length(lstm_data$test_dict$y)  # TRUE
 ```
 
 ---
@@ -399,15 +403,19 @@ Trains a `ranger` Random Forest to predict residuals. Optionally performs a rand
 **Example**
 
 ```r
+data(microclimate_sample)
+feat_cols <- get_feature_columns(microclimate_sample)
+splits <- split_train_val_test(microclimate_sample, block_days = 2, seed = 42)
+
 rf <- train_rf(
-  train_X       = splits$train[, feat_cols],
-  train_y       = splits$train$residual,
-  num_trees     = 500,
-  tune          = TRUE,
-  n_combinations = 5,
-  val_X         = splits$val[, feat_cols],
-  val_y         = splits$val$residual,
-  seed          = 42
+  train_X        = splits$train[, feat_cols],
+  train_y        = splits$train$residual,
+  num_trees      = 100,
+  tune           = TRUE,
+  n_combinations = 3,
+  val_X          = splits$val[, feat_cols],
+  val_y          = splits$val$residual,
+  seed           = 42
 )
 # RF HPO: Best MSE = ... | max_depth=..., min_node_size=..., mtry=...
 ```
@@ -416,7 +424,7 @@ rf <- train_rf(
 
 ### `build_lstm()`
 
-Builds a compiled Keras sequential model with stacked LSTM layers, dropout, and a single linear output neuron.
+Builds a compiled Keras sequential model with stacked LSTM layers, dropout, and a single linear output neuron. Requires the optional `keras3` package.
 
 **Parameters**
 
@@ -433,20 +441,26 @@ Builds a compiled Keras sequential model with stacked LSTM layers, dropout, and 
 **Example**
 
 ```r
-model <- build_lstm(
-  input_shape = c(6, length(feat_cols)),
-  n_units  = 64,
-  n_layers = 2,
-  dropout  = 0.1,
-  lr       = 0.001
-)
+data(microclimate_sample)
+feat_cols <- get_feature_columns(microclimate_sample)
+
+# Build a 2-layer LSTM model for 6-step sequences
+if (requireNamespace("keras3", quietly = TRUE)) {
+  model <- build_lstm(
+    input_shape = c(6, length(feat_cols)),
+    n_units     = 32,
+    n_layers    = 2,
+    dropout     = 0.1,
+    lr          = 0.001
+  )
+}
 ```
 
 ---
 
 ### `train_lstm()`
 
-Builds and trains a stacked LSTM using early stopping on validation loss.
+Builds and trains a stacked LSTM using early stopping on validation loss. Requires the optional `keras3` package.
 
 **Parameters**
 
@@ -470,25 +484,22 @@ Builds and trains a stacked LSTM using early stopping on validation loss.
 **Example**
 
 ```r
-lstm_data <- lstm_specific_preprocessing(
-  scaled$train, scaled$val, scaled$test,
-  window_size = 6, ts_names_col = "time_series_doc"
-)
-
-lstm_model <- train_lstm(
-  train_X    = lstm_data$train_dict$X,
-  train_y    = lstm_data$train_dict$y,
-  val_X      = lstm_data$val_dict$X,
-  val_y      = lstm_data$val_dict$y,
-  n_units    = 64,
-  n_layers   = 2,
-  dropout    = 0.1,
-  lr         = 0.001,
-  epochs     = 100,
-  batch_size = 32,
-  patience   = 10,
-  seed       = 42
-)
+if (requireNamespace("keras3", quietly = TRUE)) {
+  lstm_model <- train_lstm(
+    train_X    = lstm_data$train_dict$X,
+    train_y    = lstm_data$train_dict$y,
+    val_X      = lstm_data$val_dict$X,
+    val_y      = lstm_data$val_dict$y,
+    n_units    = 32,
+    n_layers   = 2,
+    dropout    = 0.1,
+    lr         = 0.001,
+    epochs     = 50,
+    batch_size = 32,
+    patience   = 10,
+    seed       = 42
+  )
+}
 ```
 
 ---
@@ -517,7 +528,12 @@ Applies a trained RF or LSTM correction model to new data and returns base predi
 **Example**
 
 ```r
-# RF
+data(microclimate_sample)
+feat_cols <- get_feature_columns(microclimate_sample)
+splits <- split_train_val_test(microclimate_sample, block_days = 2, seed = 42)
+rf <- train_rf(splits$train[, feat_cols], splits$train$residual, num_trees = 50, tune = FALSE)
+
+# Generate corrections on test data
 corrected_rf <- correct_predictions(
   model        = rf,
   new_data     = splits$test,
@@ -525,16 +541,6 @@ corrected_rf <- correct_predictions(
   feature_cols = feat_cols
 )
 head(corrected_rf)
-
-# LSTM
-# corrected_lstm <- correct_predictions(
-#   model        = lstm_model,
-#   new_data     = splits$test,
-#   model_type   = "lstm",
-#   scaler       = scaled$scaler,
-#   feature_cols = feat_cols,
-#   window_size  = 6
-# )
 ```
 
 ---
@@ -560,6 +566,11 @@ Computes RMSE and R² for both the uncorrected base predictions and the ML-corre
 **Example**
 
 ```r
+data(microclimate_sample)
+feat_cols <- get_feature_columns(microclimate_sample)
+splits <- split_train_val_test(microclimate_sample, block_days = 2, seed = 42)
+rf <- train_rf(splits$train[, feat_cols], splits$train$residual, num_trees = 50, tune = FALSE)
+
 metrics <- evaluate_correction(
   model           = rf,
   X               = splits$test[, feat_cols],
@@ -568,12 +579,10 @@ metrics <- evaluate_correction(
   model_type      = "rf"
 )
 
-cat(sprintf("RMSE  base: %.4f  corrected: %.4f\n",
-            metrics$rmse_base, metrics$rmse_corr))
-cat(sprintf("R²    base: %.4f  corrected: %.4f\n",
-            metrics$r2_base,   metrics$r2_corr))
-cat(sprintf("Improvement: %.1f%%\n",
-            (1 - metrics$rmse_corr / metrics$rmse_base) * 100))
+cat(sprintf("Baseline RMSE:  %.2f°C\n", metrics$rmse_base))
+cat(sprintf("Corrected RMSE: %.2f°C\n", metrics$rmse_corr))
+cat(sprintf("Improvement:    %.1f%%\n",
+            (metrics$rmse_base - metrics$rmse_corr) / metrics$rmse_base * 100))
 ```
 
 ---
@@ -582,7 +591,7 @@ cat(sprintf("Improvement: %.1f%%\n",
 
 ### `save_correction_model()`
 
-Serialises a trained model together with its scaler and feature column list to an `.rds` file.
+Saves a trained correction model (Random Forest or LSTM) and its metadata to a single, portable `.rds` file. For LSTM models, the Keras model is serialized as raw binary bytes directly inside the `.rds` file, ensuring single-file portability across R sessions.
 
 **Parameters**
 
@@ -598,7 +607,12 @@ Serialises a trained model together with its scaler and feature column list to a
 **Example**
 
 ```r
-save_correction_model(rf, scaled$scaler, feat_cols, "rf_correction.rds")
+data(microclimate_sample)
+feat_cols <- get_feature_columns(microclimate_sample)
+rf <- train_rf(microclimate_sample[, feat_cols], microclimate_sample$residual, num_trees = 20, tune = FALSE)
+
+tmp_file <- tempfile(fileext = ".rds")
+save_correction_model(rf, scaler = NULL, feature_cols = feat_cols, path = tmp_file)
 ```
 
 ---
@@ -618,17 +632,19 @@ Loads a model bundle saved by `save_correction_model()`.
 **Example**
 
 ```r
-bundle <- load_correction_model("rf_correction.rds")
+bundle <- load_correction_model(tmp_file)
 bundle$model_type     # "rf"
-bundle$feature_cols   # c("temp_air", "solar", ...)
+bundle$feature_cols   # feature column names
+unlink(tmp_file)
 
-# Re-use for prediction
+# Re-use loaded model for predictions:
 corrected <- correct_predictions(
   model        = bundle$model,
-  new_data     = splits$test,
+  new_data     = microclimate_sample[1:10, ],
   model_type   = bundle$model_type,
   feature_cols = bundle$feature_cols
 )
+head(corrected)
 ```
 
 ---
@@ -640,40 +656,45 @@ library(microclCorr)
 library(ranger)
 
 # 1. Load data
-df <- load_prepared_csv_data("harod_dataset.csv",
-                             datetime_format = "%d/%m/%Y %H:%M")
+# Retrieve real field dataset via get_example_data():
+csv_path <- get_example_data("Harod_dataset.csv")
+df <- load_prepared_csv_data(csv_path, datetime_format = "%d/%m/%Y %H:%M")
+
+# (Or for an instant in-memory quick-start: data(microclimate_sample); df <- microclimate_sample)
 
 # 2. Feature engineering
-df <- add_cyclical_time(df, add_month = TRUE)
+df <- add_cyclical_time(df, datetime_col = "time", add_month = TRUE)
 feat_cols <- get_feature_columns(df)
 
-# 3. Split
+# 3. Split into 7-day blocks
 splits <- split_train_val_test(df, block_days = 7, seed = 123)
 
-# 4. Scale (required for LSTM; harmless for RF)
+# 4. Scale features (required for LSTM; harmless for RF)
 scaled <- lstm_scaling(splits$train, splits$val, splits$test)
 
-# 5a. Train RF
-rf <- train_rf(splits$train[, feat_cols], splits$train$residual,
-               val_X = splits$val[, feat_cols], val_y = splits$val$residual)
+# 5. Train Random Forest
+rf <- train_rf(
+  train_X   = splits$train[, feat_cols],
+  train_y   = splits$train$residual,
+  val_X     = splits$val[, feat_cols],
+  val_y     = splits$val$residual,
+  num_trees = 100
+)
 
-# 5b. Train LSTM
-lstm_data <- lstm_specific_preprocessing(scaled$train, scaled$val, scaled$test,
-                                         window_size = 6)
-lstm_model <- train_lstm(lstm_data$train_dict$X, lstm_data$train_dict$y,
-                         lstm_data$val_dict$X,   lstm_data$val_dict$y)
+# 6. Evaluate correction on held-out test data
+metrics <- evaluate_correction(
+  model           = rf,
+  X               = splits$test[, feat_cols],
+  y               = splits$test$residual,
+  base_prediction = splits$test$predicted,
+  model_type      = "rf"
+)
 
-# 6. Align test sets for fair comparison
-rf_test <- align_test_sets(splits$test, lstm_data$test_dict,
-                           lstm_data$index_info, site_name_col = "time_series_doc")
+cat(sprintf("Baseline RMSE:  %.2f°C\n", metrics$rmse_base))
+cat(sprintf("Corrected RMSE: %.2f°C (%.1f%% improvement)\n",
+            metrics$rmse_corr,
+            (metrics$rmse_base - metrics$rmse_corr) / metrics$rmse_base * 100))
 
-# 7. Evaluate
-evaluate_correction(rf, rf_test[, feat_cols], rf_test$residual,
-                    rf_test$predicted, model_type = "rf")
-
-evaluate_correction(lstm_model, lstm_data$test_dict$X, lstm_data$test_dict$y,
-                    lstm_data$test_dict$base_pred, model_type = "lstm")
-
-# 8. Save
-save_correction_model(rf, scaled$scaler, feat_cols, "rf_model.rds")
+# 7. Save portable single-file model bundle
+save_correction_model(rf, scaler = scaled$scaler, feature_cols = feat_cols, path = "rf_model.rds")
 ```
