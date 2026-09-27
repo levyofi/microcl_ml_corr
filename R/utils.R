@@ -12,16 +12,61 @@
                    "location", "site_id")
 )
 
-#' Check if keras3 is installed
+.onLoad <- function(libname, pkgname) {
+  # Block reticulate and keras3 from automatically downloading/installing packages via uv or ephemeral venvs
+  if (Sys.getenv("RETICULATE_AUTOCONFIGURE") == "") {
+    Sys.setenv(RETICULATE_AUTOCONFIGURE = "FALSE")
+  }
+  if (Sys.getenv("RETICULATE_USE_MANAGED_VENV") == "") {
+    Sys.setenv(RETICULATE_USE_MANAGED_VENV = "no")
+  }
+}
+
+#' Check if keras3 and required backend are installed without auto-installing packages
+#' @param check_backend Logical. Whether to verify the Python backend is available.
 #' @keywords internal
-check_keras3 <- function() {
+check_keras3 <- function(check_backend = TRUE) {
+  # Explicitly ensure auto-configuration and auto-downloading are disabled
+  Sys.setenv(RETICULATE_AUTOCONFIGURE = "FALSE")
+  Sys.setenv(RETICULATE_USE_MANAGED_VENV = "no")
+
   if (!requireNamespace("keras3", quietly = TRUE)) {
     stop(
-      "Package 'keras3' is required to build, train, evaluate, or load LSTM models.\n",
-      "Please install it using: install.packages('keras3')\n",
-      "and configure Keras with: keras3::install_keras()",
+      "Package 'keras3' is required to build, train, evaluate, or predict with LSTM models, but is not installed.\n",
+      "Please install it manually using: install.packages('keras3')",
       call. = FALSE
     )
+  }
+
+  if (!requireNamespace("reticulate", quietly = TRUE)) {
+    stop(
+      "Package 'reticulate' is required to interface with Python for LSTM models, but is not installed.\n",
+      "Please install it manually using: install.packages('reticulate')",
+      call. = FALSE
+    )
+  }
+
+  if (check_backend) {
+    has_backend <- tryCatch({
+      if (!reticulate::py_available(initialize = TRUE)) return(FALSE)
+      reticulate::py_module_available("keras") || reticulate::py_module_available("tensorflow")
+    }, error = function(e) FALSE)
+
+    if (!has_backend) {
+      stop(
+        "A Python environment with 'keras' or 'tensorflow' is required for LSTM operations, but none was found.\n",
+        "Automatic background package installation has been blocked.\n\n",
+        "To configure your Python environment manually, please do one of the following:\n",
+        "  1. If you have an existing Python environment with TensorFlow/Keras:\n",
+        "     Sys.setenv(RETICULATE_PYTHON = '/path/to/python')\n",
+        "     or in R: reticulate::use_condaenv('your_env')\n",
+        "     or in R: reticulate::use_virtualenv('your_env')\n\n",
+        "  2. To install TensorFlow and Keras into a Python environment manually:\n",
+        "     reticulate::py_install(c('tensorflow', 'keras'))\n",
+        "     or in your shell terminal: pip install tensorflow keras\n",
+        call. = FALSE
+      )
+    }
   }
 }
 
@@ -30,8 +75,8 @@ check_keras3 <- function() {
 check_tensorflow <- function() {
   if (!requireNamespace("tensorflow", quietly = TRUE)) {
     stop(
-      "Package 'tensorflow' is required for TensorFlow operations.\n",
-      "Please install it using: install.packages('tensorflow')",
+      "Package 'tensorflow' is required for TensorFlow operations, but is not installed.\n",
+      "Please install it manually using: install.packages('tensorflow')",
       call. = FALSE
     )
   }
@@ -128,8 +173,9 @@ load_correction_model <- function(path) {
 
 #' Setup Tensorflow environment
 #'
-#' Finds or creates a Python environment with TensorFlow and Keras configured,
+#' Finds an existing Python environment with TensorFlow and Keras configured,
 #' and sets environment variables before reticulate binds to Python.
+#' Does NOT automatically install packages or create virtual environments.
 #'
 #' @return Invisible file path to the Python executable, or NULL.
 #' @examples
@@ -141,13 +187,17 @@ load_correction_model <- function(path) {
 #' }
 #' @export
 setup_tensorflow <- function() {
+  # Block reticulate and keras3 from automatically downloading/installing packages via uv or ephemeral venvs
+  Sys.setenv(RETICULATE_AUTOCONFIGURE = "FALSE")
+  Sys.setenv(RETICULATE_USE_MANAGED_VENV = "no")
+
   if (!requireNamespace("reticulate", quietly = TRUE)) {
-    stop("Package 'reticulate' is required to configure Python and TensorFlow.\n",
-         "Please install it using: install.packages('reticulate')", call. = FALSE)
+    stop("Package 'reticulate' is required to configure Python and TensorFlow, but is not installed.\n",
+         "Please install it manually using: install.packages('reticulate')", call. = FALSE)
   }
   if (!requireNamespace("tensorflow", quietly = TRUE)) {
-    stop("Package 'tensorflow' is required to use TensorFlow in R.\n",
-         "Please install it using: install.packages('tensorflow')", call. = FALSE)
+    stop("Package 'tensorflow' is required to use TensorFlow in R, but is not installed.\n",
+         "Please install it manually using: install.packages('tensorflow')", call. = FALSE)
   }
 
   if (Sys.getenv("KERAS_HOME") == "") {
@@ -161,7 +211,47 @@ setup_tensorflow <- function() {
     return(invisible(Sys.getenv("RETICULATE_PYTHON")))
   }
 
-  # 1. Check reticulate uv cache if present (common on macOS/Linux with reticulate >= 1.35)
+  # 1. Check existing virtual environment 'microcl_env'
+  env_name <- "microcl_env"
+  if (reticulate::virtualenv_exists(env_name)) {
+    py <- tryCatch(reticulate::virtualenv_python(env_name), error = function(e) NULL)
+    if (!is.null(py) && file.exists(py)) {
+      has_tf <- tryCatch({
+        res <- suppressWarnings(
+          system2(py, args = c("-c", "\"import tensorflow\""),
+                  stdout = FALSE, stderr = FALSE))
+        identical(res, 0L)
+      }, error = function(e) FALSE)
+      if (has_tf) {
+        Sys.setenv(RETICULATE_PYTHON = py)
+        message("setup_tensorflow: using virtualenv '", env_name, "' (", py, ")")
+        return(invisible(py))
+      }
+    }
+  }
+
+  # 2. Check conda environments if conda is available
+  conda_envs <- tryCatch(reticulate::conda_list(), error = function(e) NULL)
+  if (!is.null(conda_envs) && nrow(conda_envs) > 0) {
+    for (i in seq_len(nrow(conda_envs))) {
+      py <- conda_envs$python[i]
+      if (file.exists(py) && file.access(py, 1) == 0) {
+        has_tf <- tryCatch({
+          res <- suppressWarnings(
+            system2(py, args = c("-c", "\"import tensorflow\""),
+                    stdout = FALSE, stderr = FALSE))
+          identical(res, 0L)
+        }, error = function(e) FALSE)
+        if (has_tf) {
+          Sys.setenv(RETICULATE_PYTHON = py)
+          message("setup_tensorflow: using conda environment '", conda_envs$name[i], "' (", py, ")")
+          return(invisible(py))
+        }
+      }
+    }
+  }
+
+  # 3. Check reticulate cache if present
   cache_root <- file.path(path.expand("~"), "Library", "Caches",
                           "org.R-project.R", "R", "reticulate", "uv",
                           "cache", "archive-v0")
@@ -178,22 +268,28 @@ setup_tensorflow <- function() {
         }, error = function(e) FALSE)
         if (has_tf) {
           Sys.setenv(RETICULATE_PYTHON = py)
-          message("setup_tensorflow: using ", py)
+          message("setup_tensorflow: using cached python ", py)
           return(invisible(py))
         }
       }
     }
   }
 
-  # 2. Check or create dedicated virtual environment 'microcl_env'
-  env_name <- "microcl_env"
-  if (!reticulate::virtualenv_exists(env_name)) {
-    reticulate::virtualenv_create(env_name, packages = c("tensorflow", "keras"))
-  }
-  reticulate::use_virtualenv(env_name, required = TRUE)
-
-  py_path <- tryCatch(reticulate::py_exe(), error = function(e) NULL)
-  invisible(py_path)
+  # 4. If no existing environment with TensorFlow was found, STOP with instructions (no auto-install!)
+  stop(
+    "No existing Python environment with 'tensorflow' was found.\n",
+    "Automatic background package installation has been blocked.\n\n",
+    "Please configure an environment with TensorFlow and Keras manually:\n",
+    "  1. If you already have an environment with TensorFlow/Keras:\n",
+    "     Sys.setenv(RETICULATE_PYTHON = '/path/to/python')\n",
+    "     or in R: reticulate::use_condaenv('your_env')\n",
+    "     or in R: reticulate::use_virtualenv('your_env')\n\n",
+    "  2. To create/install TensorFlow in a virtual environment manually:\n",
+    "     reticulate::virtualenv_create('microcl_env', packages = c('tensorflow', 'keras'))\n",
+    "     reticulate::use_virtualenv('microcl_env')\n",
+    "     or in shell terminal: pip install tensorflow keras\n",
+    call. = FALSE
+  )
 }
 
 #' Get path to an example dataset (downloading on demand if needed)

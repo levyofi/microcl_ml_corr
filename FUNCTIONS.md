@@ -25,7 +25,7 @@ df <- microclimate_sample
 
 ### `setup_tensorflow()`
 
-Finds or creates a Python virtual environment with TensorFlow and Keras configured, and sets environment variables (`RETICULATE_PYTHON`, `KERAS_HOME`) before `reticulate` binds to Python.
+Finds an existing Python environment with TensorFlow and Keras configured, and sets environment variables (`RETICULATE_PYTHON`, `KERAS_HOME`) before `reticulate` binds to Python. Never automatically installs packages; if no valid environment is found, it raises an error with instructions for manual configuration.
 
 **Parameters**
 

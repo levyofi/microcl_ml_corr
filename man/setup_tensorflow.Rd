@@ -10,8 +10,9 @@ setup_tensorflow()
 Invisible file path to the Python executable, or NULL.
 }
 \description{
-Finds or creates a Python environment with TensorFlow and Keras configured,
+Finds an existing Python environment with TensorFlow and Keras configured,
 and sets environment variables before reticulate binds to Python.
+Does NOT automatically install packages or create virtual environments.
 }
 \examples{
 \dontrun{
