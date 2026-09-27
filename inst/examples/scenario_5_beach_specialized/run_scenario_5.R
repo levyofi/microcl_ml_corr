@@ -12,7 +12,7 @@
 # Compare with: Scenario 2 (single logger), Scenario 4 (all sites pooled)
 # =============================================================================
 
-source(system.file("examples", "utils.R", package = "microclCorr"))
+source(system.file("examples", "examples_utility_functions.R", package = "microclCorr"))
 setup_tensorflow()
 library(reticulate)
 py_require("tensorflow")

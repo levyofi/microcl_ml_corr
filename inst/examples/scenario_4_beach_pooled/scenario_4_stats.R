@@ -6,11 +6,10 @@ suppressPackageStartupMessages({
 })
 
 pkg_base <- ".."
-if (!file.exists(file.path(pkg_base, "package_utils.R"))) {
+if (!file.exists(file.path(pkg_base, "examples_utility_functions.R"))) {
   pkg_base <- system.file("examples", package = "microclCorr")
 }
-source(file.path(pkg_base, "package_utils.R"))
-source(file.path(pkg_base, "utils.R"))
+source(file.path(pkg_base, "examples_utility_functions.R"))
 
 SCENARIO_DIR <- "."
 RESULTS_DIR  <- file.path(SCENARIO_DIR, "results")

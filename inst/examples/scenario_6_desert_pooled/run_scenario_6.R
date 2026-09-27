@@ -11,7 +11,7 @@
 #       the performance difference is not purely due to spatial diversity.
 # =============================================================================
 
-source(system.file("examples", "utils.R", package = "microclCorr"))
+source(system.file("examples", "examples_utility_functions.R", package = "microclCorr"))
 setup_tensorflow()
 library(reticulate)
 py_require("tensorflow")

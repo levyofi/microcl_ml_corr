@@ -25,13 +25,13 @@
 #
 # Note: Desert temperature patterns are very regular (hot days, cool nights,
 # repeated daily). Both models learn the correction pattern quickly — often
-# from just 1–2 days of data. See learning_curve_example.R to verify this.
+# from just 1–2 days of data. See find_min_training_days() in examples_utility_functions.R to verify this.
 #
-# Want to know how many days of data you need? See learning_curve_example.R.
+# Want to know how many days of data you need? See find_min_training_days() in examples_utility_functions.R.
 # Compare with: Scenario 6 (pooled, all 48 desert loggers combined)
 # =============================================================================
 
-source(system.file("examples", "utils.R", package = "microclCorr"))
+source(system.file("examples", "examples_utility_functions.R", package = "microclCorr"))
 setup_tensorflow()
 library(reticulate)
 py_require("tensorflow")

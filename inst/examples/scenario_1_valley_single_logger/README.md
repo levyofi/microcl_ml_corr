@@ -28,4 +28,4 @@ source(system.file("examples", "scenario_1_valley_single_logger", "run_scenario_
 
 Average RMSE across microhabitats reduced from ~5.2 °C (NicheMapR) to ~2.6 °C (RF, 42%)
 and ~2.9 °C (LSTM, 39%). RF leads on Sun and Shade; LSTM leads on Air.
-To explore how many days of data are needed, run `learning_curve_example.R`.
+To explore how many days of data are needed, use `find_min_training_days()` in `examples_utility_functions.R`.

@@ -28,4 +28,4 @@ source(system.file("examples", "scenario_2_beach_single_logger", "run_scenario_2
 
 RMSE reduced from ~11.9 °C (NicheMapR baseline) to ~1.4 °C (RF, 88%) and ~2.5 °C (LSTM, 79%).
 RF outperforms LSTM at this training set size.
-To explore how many days of data are needed, run `learning_curve_example.R`.
+To explore how many days of data are needed, use `find_min_training_days()` in `examples_utility_functions.R`.

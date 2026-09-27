@@ -95,7 +95,7 @@ more (+1.13 °C). Both models reduce daily extremes RMSE by ~68–83%.
 RF and LSTM perform comparably on average (~71% improvement each), with RF leading on Rock and LSTM
 leading on Bush. The NicheMapR baseline error is large (~6.4 °C) due to the complex rock and bush
 surface energy balance; both models correct it substantially.
-To find the minimum number of training days needed, run `learning_curve_example.R`.
+To find the minimum number of training days needed, use `find_min_training_days()` in `examples_utility_functions.R`.
 
 ---
 

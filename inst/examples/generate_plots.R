@@ -5,8 +5,7 @@
 # =============================================================================
 
 Sys.setenv(UV_OFFLINE="1", KERAS_HOME=getwd())
-source("package_utils.R")
-source("utils.R")
+source("examples_utility_functions.R")
 library(keras3)
 library(reticulate)
 library(microclCorr)

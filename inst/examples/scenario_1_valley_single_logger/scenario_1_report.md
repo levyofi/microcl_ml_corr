@@ -150,7 +150,7 @@ shows the largest correction (91.2% RF improvement) driven by NicheMapR's very l
 on that test week (baseline RMSE 10.5 °C). Both models produce near-zero mean errors on this
 test block, confirming that the over-correction seen with the original seed (Apr 2–8 test block)
 was a block-selection artefact rather than a systematic model flaw (see Section 6).
-To find the minimum number of training days needed, run `learning_curve_example.R`.
+To find the minimum number of training days needed, use `find_min_training_days()` in `examples_utility_functions.R`.
 
 ---
 

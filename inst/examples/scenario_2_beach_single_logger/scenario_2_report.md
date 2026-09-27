@@ -75,7 +75,7 @@ Both RF and LSTM achieve near-equivalent, large improvements over the NicheMapR 
 demonstrating that even a single beach logger provides sufficient signal to substantially reduce
 coastal microclimate errors. The very high baseline error reflects NicheMapR's difficulty with the
 complex coastal energy balance; after correction, both models reach sub-1.5 °C RMSE.
-To find the minimum number of training days needed, run `learning_curve_example.R`.
+To find the minimum number of training days needed, use `find_min_training_days()` in `examples_utility_functions.R`.
 
 ---
 

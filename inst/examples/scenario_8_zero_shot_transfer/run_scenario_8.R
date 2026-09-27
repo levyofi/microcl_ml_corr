@@ -29,7 +29,7 @@
 #       is already ~3× more data than the single logger in Scenario 2.
 # =============================================================================
 
-source(system.file("examples", "utils.R", package = "microclCorr"))
+source(system.file("examples", "examples_utility_functions.R", package = "microclCorr"))
 library(microclCorr)
 library(ggplot2)
 library(gridExtra)

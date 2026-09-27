@@ -27,11 +27,11 @@
 # surface temperature, making NicheMapR errors larger and harder to correct
 # than in inland habitats. More training data is needed here than in the desert.
 #
-# Want to know how many days of data you need? See learning_curve_example.R.
+# Want to know how many days of data you need? See find_min_training_days() in examples_utility_functions.R.
 # Compare with: Scenario 4 (pooled, all beach loggers combined)
 # =============================================================================
 
-source(system.file("examples", "utils.R", package = "microclCorr"))
+source(system.file("examples", "examples_utility_functions.R", package = "microclCorr"))
 setup_tensorflow()
 library(reticulate)
 py_require("tensorflow")

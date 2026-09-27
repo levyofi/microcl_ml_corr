@@ -29,4 +29,4 @@ source(system.file("examples", "scenario_3_desert_single_logger", "run_scenario_
 
 Average RMSE reduced from ~6.4 °C (NicheMapR baseline) to ~1.9 °C for both models (~71% improvement).
 RF leads on Rock; LSTM leads on Bush. To find the minimum training days needed,
-run `learning_curve_example.R`.
+use `find_min_training_days()` in `examples_utility_functions.R`.

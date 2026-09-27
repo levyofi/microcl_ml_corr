@@ -38,7 +38,7 @@ Accuracy is measured by **RMSE** (Root Mean Squared Error, in °C). Lower RMSE =
 ```
 examples/
 ├── README.md                      ← this file
-├── utils.R                        ← shared helper functions (loaded automatically)
+├── examples_utility_functions.R  ← shared helper functions (loaded automatically)
 │
 ├── preprocessing_examples/        ← Step 0: prepare your own CSV files
 │   ├── README.md

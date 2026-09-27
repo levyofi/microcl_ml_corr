@@ -8,9 +8,8 @@ library(cowplot)
 
 if (!exists("SEED")) SEED <- 123
 if (!exists("load_prepared_csv_data")) {
-  root_dir <- if (file.exists("utils.R")) "." else ".."
-  source(file.path(root_dir, "package_utils.R"))
-  source(file.path(root_dir, "utils.R"))
+  root_dir <- if (file.exists("examples_utility_functions.R")) "." else ".."
+  source(file.path(root_dir, "examples_utility_functions.R"))
   library(keras3)
   library(reticulate)
   library(microclCorr)

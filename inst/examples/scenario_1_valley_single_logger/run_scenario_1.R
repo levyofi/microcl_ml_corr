@@ -22,10 +22,10 @@
 #   Accuracy is measured by RMSE (°C); lower = better.
 #
 # Want to know how many days of data you actually need?
-#   See inst/examples/learning_curve_example.R for find_min_training_days().
+#   See find_min_training_days() in examples_utility_functions.R.
 # =============================================================================
 
-source(system.file("examples", "utils.R", package = "microclCorr"))
+source(system.file("examples", "examples_utility_functions.R", package = "microclCorr"))
 setup_tensorflow()
 library(reticulate)
 py_require("tensorflow")

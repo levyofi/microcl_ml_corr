@@ -1,16 +1,88 @@
-# inst/examples/utils.R
-# Shared helper functions used by scenario scripts.
-# Source this file at the top of any scenario that loads pre-defined splits.
+# inst/examples/examples_utility_functions.R
+# Shared utility functions and model persistence helpers for microclCorr examples.
+# Source this file to access helper functions used across scenario scripts.
+
+# ---- Default Columns & Model Persistence Helpers ----
+
+#' Default column names used throughout the package
+#' @keywords internal
+.default_cols <- list(
+  datetime     = "time",
+  target       = "residual",
+  prediction   = "predicted",
+  microhabitat = "microhabitat",
+  ts_names     = "time_series_doc",
+  avoid        = c("time_series_doc", "time_series_site", "TIME", "time",
+                   "location", "site_id")
+)
+
+#' Save a correction model to disk
+#'
+#' RF models are saved entirely in the .rds file. Keras (LSTM) models are
+#' saved to a temporary .keras file, read as raw bytes, and embedded into the 
+#' .rds file so they can be reloaded seamlessly as a single file by any user.
+#'
+#' @param model Trained model (ranger or keras)
+#' @param scaler List with min/max from scaling
+#' @param feature_cols Character vector of feature column names
+#' @param path File path to save to (.rds extension)
+save_correction_model <- function(model, scaler, feature_cols, path) {
+  is_rf      <- inherits(model, "ranger")
+  model_type <- if (is_rf) "rf" else "lstm"
+
+  keras_bytes <- NULL
+  if (!is_rf) {
+    keras_tmp <- tempfile(fileext = ".keras")
+    keras3::save_model(model, keras_tmp)
+    keras_bytes <- readBin(keras_tmp, "raw", file.info(keras_tmp)$size)
+    unlink(keras_tmp)
+    model <- NULL # don't embed the Python pointer
+  }
+
+  obj <- list(
+    model        = model,
+    keras_bytes  = keras_bytes,
+    scaler       = scaler,
+    feature_cols = feature_cols,
+    model_type   = model_type
+  )
+  saveRDS(obj, path)
+  invisible(path)
+}
+
+#' Load a correction model from disk
+#'
+#' @param path File path to the .rds model
+#' @return List with model, scaler, feature_cols, model_type
+load_correction_model <- function(path) {
+  obj <- readRDS(path)
+  if (identical(obj$model_type, "lstm")) {
+    keras_path <- sub("\\.rds$", ".keras", path)
+    if (file.exists(keras_path)) {
+      obj$model <- keras3::load_model(keras_path)
+    } else if (!is.null(obj$keras_bytes)) {
+      keras_tmp <- tempfile(fileext = ".keras")
+      writeBin(obj$keras_bytes, keras_tmp)
+      obj$model <- keras3::load_model(keras_tmp)
+      unlink(keras_tmp)
+    } else {
+      # Fallback for models saved with serialize_keras_object
+      tryCatch({
+        obj$model <- keras3::deserialize_keras_object(obj$model)
+      }, error = function(e) {
+        stop("Failed to load LSTM model. Dead python pointer and no side-by-side .keras file found.")
+      })
+    }
+  }
+  obj
+}
+
+# ---- TensorFlow / Reticulate Setup ----
 
 # setup_tensorflow ---------------------------------------------------------------
 # Finds a Python environment with TensorFlow installed (searches the reticulate
 # uv cache) and sets RETICULATE_PYTHON before reticulate binds to Python.
 # Call this BEFORE library(reticulate) and py_require("tensorflow").
-#
-# Usage (at top of every scenario script, replacing the manual env var):
-#   source(system.file("examples", "utils.R", package = "microclCorr"))
-#   setup_tensorflow()
-#   library(reticulate); py_require("tensorflow")
 setup_tensorflow <- function() {
   if (nchar(Sys.getenv("RETICULATE_PYTHON")) > 0) return(invisible(NULL))
 
@@ -39,6 +111,8 @@ setup_tensorflow <- function() {
   }
   invisible(NULL)  # reticulate will find TF via py_require on its own
 }
+
+# ---- Data Splitting & Learning Curves ----
 
 # load_splits_from_csv -----------------------------------------------------------
 # Scenarios 4-8 use a pre-defined CSV file that assigns every row in the dataset
@@ -73,30 +147,6 @@ load_splits_from_csv <- function(data, splits_csv, site_col, datetime_col = "tim
 # The function trains RF and/or LSTM at progressively smaller training sizes
 # (e.g. 1, 2, 3, 7, 14, 21, 28, 35, 42 days) and finds the minimum number of
 # days where accuracy stays within `tolerance` of the full-data result.
-#
-# For example, tolerance = 0.10 means "find the fewest days where RMSE is at
-# most 10% worse than training on all available data".
-#
-# Arguments:
-#   splits        — list(train, val, test) from split_train_val_test()
-#   lstm_2h       — output of lstm_specific_preprocessing() with window_size=2
-#   feature_cols  — character vector from get_feature_columns()
-#   rf_model      — trained RF model (from train_rf()) used as full-data reference
-#   lstm_model    — trained LSTM model (from train_lstm()) as full-data reference
-#   lstm_params   — list(n_units, n_layers, dropout, lr) from lstm_hypertuning()
-#   rf_test       — aligned RF test set from align_test_sets()
-#   X_test_lstm, y_test_lstm, base_test_lstm — aligned LSTM test arrays
-#   site_col      — column name identifying the logger
-#   tolerance     — acceptable fraction above full-data RMSE (default 0.10 = 10%)
-#   training_days — vector of training sizes to test (in days)
-#   n_runs        — number of random repetitions per size (for variance estimate)
-#   seed          — base random seed
-#
-# Returns a list with:
-#   $results  — data frame with RMSE at every training size and run
-#   $summary  — mean RMSE ± SD per model per training size
-#   $min_days — named vector: minimum days needed per model at the given tolerance
-#   $plot     — ggplot learning curve (print it or ggsave it)
 find_min_training_days <- function(splits, lstm_2h, feature_cols,
                                    rf_model, lstm_model, lstm_params,
                                    rf_test, X_test_lstm, y_test_lstm, base_test_lstm,
@@ -240,27 +290,11 @@ logger_temp_stats <- function(data_subset, label) {
   )
 }
 
-# make_pred_plot -----------------------------------------------------------------
-# Build a ggplot showing observed, NicheMapR, RF-corrected, and LSTM-corrected
-# temperature lines for a single panel.
-#
-# Arguments:
-#   df           — data frame with columns: time, measured, base, rf, lstm
-#   title_str    — plot title
-#   show_legend  — whether to draw the colour legend (set FALSE for panels 2+
-#                  in a multi-panel grid to avoid repetition)
-#   linewidth_obs — line width for the Observed series
+# ---- Plotting & Reporting Helpers ----
+
 # make_residual_hist -------------------------------------------------------------
 # Overlay histograms of hourly residuals (measured − predicted) for NicheMapR
 # (before correction), RF, and LSTM (after correction).
-#
-# Arguments:
-#   full_df     — data frame with columns: measured, base, rf, lstm
-#                 (lstm column is optional; omit or set has_lstm = FALSE)
-#   title_str   — plot title
-#   has_lstm    — whether to include the LSTM series (default TRUE)
-#
-# Residuals are defined as measured − model, so positive = model under-predicts.
 make_residual_hist <- function(full_df, title_str, has_lstm = TRUE,
                                xlim = NULL, show_strip = TRUE, show_legend = TRUE,
                                panel_letter = NULL, panel_letters = NULL,
@@ -287,38 +321,27 @@ make_residual_hist <- function(full_df, title_str, has_lstm = TRUE,
   res_rf   <- full_df$measured - full_df$rf
 
   rows <- list(
-    data.frame(residual = res_base, model = "Uncorrected
-NicheMapR"),
-    data.frame(residual = res_rf,   model = "Random Forest
-Correction")
+    data.frame(residual = res_base, model = "Uncorrected\nNicheMapR"),
+    data.frame(residual = res_rf,   model = "Random Forest\nCorrection")
   )
 
   if (has_lstm && "lstm" %in% names(full_df)) {
     rows[[3]] <- data.frame(residual = full_df$measured - full_df$lstm,
-                            model    = "LSTM
-Correction")
+                            model    = "LSTM\nCorrection")
   }
 
   df_long <- do.call(rbind, rows)
-  model_levels <- c("Uncorrected
-NicheMapR", "Random Forest
-Correction", "LSTM
-Correction")
+  model_levels <- c("Uncorrected\nNicheMapR", "Random Forest\nCorrection", "LSTM\nCorrection")
   clean_labels <- c("Uncorrected NicheMapR", "Random Forest Correction", "LSTM Correction")
   if (!has_lstm) {
-    model_levels <- c("Uncorrected
-NicheMapR", "Random Forest
-Correction")
+    model_levels <- c("Uncorrected\nNicheMapR", "Random Forest\nCorrection")
     clean_labels <- c("Uncorrected NicheMapR", "Random Forest Correction")
   }
   df_long$model <- factor(df_long$model, levels = model_levels)
 
-  cols <- c("Uncorrected
-NicheMapR"   = "#dc2626",
-            "Random Forest
-Correction" = "#059669",
-            "LSTM
-Correction"         = "#2563eb")
+  cols <- c("Uncorrected\nNicheMapR"   = "#dc2626",
+            "Random Forest\nCorrection" = "#059669",
+            "LSTM\nCorrection"         = "#2563eb")
 
   if (is.null(xlim)) xlim <- range(df_long$residual, na.rm = TRUE)
 
@@ -367,6 +390,9 @@ Correction"         = "#2563eb")
   return(p)
 }
 
+# make_pred_plot -----------------------------------------------------------------
+# Build a ggplot showing observed, NicheMapR, RF-corrected, and LSTM-corrected
+# temperature lines for a single panel.
 make_pred_plot <- function(df, title_str, show_legend = TRUE, linewidth_obs = 1.1,
                            has_lstm = TRUE, panel_letter = NULL) {
   p <- ggplot2::ggplot(df, ggplot2::aes(x = time)) +
@@ -408,14 +434,6 @@ make_pred_plot <- function(df, title_str, show_legend = TRUE, linewidth_obs = 1.
 # build_pred_df ------------------------------------------------------------------
 # Assemble the four-column prediction data frame from model objects and test data.
 # Returns a data frame sorted by time with columns: time, measured, base, rf, lstm.
-#
-# Arguments:
-#   rf_test        — aligned RF test set (data frame)
-#   feature_cols   — character vector of predictor column names
-#   rf_model       — trained ranger model
-#   base_test_lstm — NicheMapR predictions aligned to LSTM test windows
-#   lstm_model     — trained Keras LSTM model
-#   X_test_lstm    — 3-D array of LSTM test windows
 build_pred_df <- function(rf_test, feature_cols, rf_model,
                            base_test_lstm, lstm_model, X_test_lstm) {
   rf_preds   <- rf_test$predicted +
@@ -423,8 +441,7 @@ build_pred_df <- function(rf_test, feature_cols, rf_model,
   lstm_preds <- base_test_lstm +
                 as.numeric(predict(lstm_model, X_test_lstm, verbose = 0)[, 1])
   # Preserve the original row order — predictions are positionally aligned to
-  # rf_test rows. Callers should sort per site after filtering; sorting here
-  # across multiple sites would break the positional alignment.
+  # rf_test rows.
   data.frame(
     time     = rf_test$time,
     measured = rf_test$predicted + rf_test$residual,
@@ -437,19 +454,6 @@ build_pred_df <- function(rf_test, feature_cols, rf_model,
 # compute_daily_stats ------------------------------------------------------------
 # From a prediction data frame (columns: time, measured, base, rf, and
 # optionally lstm), compute summary statistics of daily errors.
-#
-# For each model (base, rf, lstm) and each daily aggregate (min, mean, max):
-#   - Compute the per-day absolute error and signed error
-#   - Return avg ± SD of RMSE across days and avg ± SD of ME across days
-#
-# Returns a data frame with one row per model, columns:
-#   model,
-#   rmse_mean_avg, rmse_mean_sd,   (RMSE of daily means across days)
-#   rmse_min_avg,  rmse_min_sd,    (RMSE of daily mins  across days)
-#   rmse_max_avg,  rmse_max_sd,    (RMSE of daily maxes across days)
-#   me_mean_avg,   me_mean_sd,     (ME   of daily means across days)
-#   me_min_avg,    me_min_sd,      (ME   of daily mins  across days)
-#   me_max_avg,    me_max_sd       (ME   of daily maxes across days)
 compute_daily_stats <- function(full_df) {
   full_df$date <- as.Date(full_df$time)
   daily <- do.call(rbind, lapply(split(full_df, full_df$date), function(d) {
@@ -495,7 +499,6 @@ compute_daily_stats <- function(full_df) {
 
 # print_daily_stats --------------------------------------------------------------
 # Pretty-print the output of compute_daily_stats() for one microhabitat/logger.
-# Prints two tables: RMSE and ME, each avg ± SD across days.
 print_daily_stats <- function(ds, label) {
   cat(sprintf("\n  %s\n", label))
   cat(sprintf("  %-8s | %20s | %20s | %20s\n",
@@ -606,4 +609,3 @@ get_example_data <- function(filename,
   message("Dataset cached at: ", normalizePath(target_file))
   normalizePath(target_file)
 }
-

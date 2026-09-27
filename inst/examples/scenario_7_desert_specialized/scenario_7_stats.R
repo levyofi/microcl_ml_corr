@@ -1,7 +1,7 @@
 
 suppressPackageStartupMessages({ library(microclCorr); library(ranger); library(keras3) })
-pkg_base <- ".."; if (!file.exists(file.path(pkg_base, "package_utils.R"))) pkg_base <- system.file("examples", package = "microclCorr")
-source(file.path(pkg_base, "package_utils.R")); source(file.path(pkg_base, "utils.R"))
+pkg_base <- ".."; if (!file.exists(file.path(pkg_base, "examples_utility_functions.R"))) pkg_base <- system.file("examples", package = "microclCorr")
+source(file.path(pkg_base, "examples_utility_functions.R"))
 RESULTS_DIR <- "./results"; DATA_PATH <- get_example_data("desert_data_preprocessed.csv")
 SPLITS_PATH <- get_example_data("desert_splits.csv"); SITE_COL <- "site_id"
 data   <- load_prepared_csv_data(DATA_PATH, datetime_format = "%Y-%m-%d %H:%M:%S", includes_index = TRUE)
