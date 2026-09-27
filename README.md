@@ -121,10 +121,6 @@ R CMD check --no-manual microclCorr_0.1.0.tar.gz
 Download `microclCorr_0.1.0.tar.gz` from the repository and install it directly:
 
 ```R
-# In R:
-install.packages("microclCorr_0.1.0.tar.gz", repos = NULL, type = "source")
-
-# Or using remotes:
 if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
 remotes::install_local("microclCorr_0.1.0.tar.gz")
 ```
@@ -140,21 +136,14 @@ The pre-built `.tar.gz` package contains all package functions and compiled vign
 
 > **[https://anonymous.4open.science/r/microcl_ml_corr-3E14/](https://anonymous.4open.science/r/microcl_ml_corr-3E14/)**
 
-You can install the package directly from the downloaded ZIP file:
+You can install the package directly from the downloaded ZIP file (dependencies such as `ranger` are installed automatically):
 
 ```R
 if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
 remotes::install_local("microcl_ml_corr-3E14.zip")
 ```
 
-
-### 2. Install core dependencies
-
-```R
-install.packages(c("ranger", "reticulate"))
-```
-
-### 3. Set up TensorFlow (required for LSTM models only)
+### 2. Set up TensorFlow (required for LSTM models only)
 
 The LSTM model uses Python's TensorFlow library under the hood. To configure your environment for TensorFlow:
 
