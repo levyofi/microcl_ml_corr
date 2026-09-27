@@ -74,26 +74,66 @@ load_correction_model <- function(path) {
 }
 
 #' Setup Tensorflow environment
+#'
+#' Finds or creates a Python environment with TensorFlow and Keras configured,
+#' and sets environment variables before reticulate binds to Python.
+#'
+#' @return Invisible file path to the Python executable, or NULL.
 #' @export
 setup_tensorflow <- function() {
   if (!requireNamespace("reticulate", quietly = TRUE)) {
-    stop("Package 'reticulate' is required to set up TensorFlow. Please install it using install.packages('reticulate').")
+    stop("Package 'reticulate' is required to configure Python and TensorFlow.\n",
+         "Please install it using: install.packages('reticulate')", call. = FALSE)
   }
-  
+  if (!requireNamespace("tensorflow", quietly = TRUE)) {
+    stop("Package 'tensorflow' is required to use TensorFlow in R.\n",
+         "Please install it using: install.packages('tensorflow')", call. = FALSE)
+  }
+
   if (Sys.getenv("KERAS_HOME") == "") {
-    Sys.setenv(KERAS_HOME = normalizePath("."))
+    k_dir <- tryCatch(tools::R_user_dir("microclCorr", "config"),
+                      error = function(e) file.path(tempdir(), "keras_home"))
+    if (!dir.exists(k_dir)) dir.create(k_dir, recursive = TRUE, showWarnings = FALSE)
+    Sys.setenv(KERAS_HOME = k_dir)
   }
-  
+
+  if (nzchar(Sys.getenv("RETICULATE_PYTHON"))) {
+    return(invisible(Sys.getenv("RETICULATE_PYTHON")))
+  }
+
+  # 1. Check reticulate uv cache if present (common on macOS/Linux with reticulate >= 1.35)
+  cache_root <- file.path(path.expand("~"), "Library", "Caches",
+                          "org.R-project.R", "R", "reticulate", "uv",
+                          "cache", "archive-v0")
+  if (dir.exists(cache_root)) {
+    all_files  <- list.files(cache_root, recursive = TRUE, full.names = TRUE)
+    candidates <- all_files[grepl("/bin/python3?$", all_files)]
+    for (py in candidates) {
+      if (file.access(py, 1) == 0) {
+        has_tf <- tryCatch({
+          res <- suppressWarnings(
+            system2(py, args = c("-c", "\"import tensorflow\""),
+                    stdout = FALSE, stderr = FALSE))
+          identical(res, 0L)
+        }, error = function(e) FALSE)
+        if (has_tf) {
+          Sys.setenv(RETICULATE_PYTHON = py)
+          message("setup_tensorflow: using ", py)
+          return(invisible(py))
+        }
+      }
+    }
+  }
+
+  # 2. Check or create dedicated virtual environment 'microcl_env'
   env_name <- "microcl_env"
   if (!reticulate::virtualenv_exists(env_name)) {
     reticulate::virtualenv_create(env_name, packages = c("tensorflow", "keras"))
   }
   reticulate::use_virtualenv(env_name, required = TRUE)
-  
-  # Ensure python works
-  tryCatch({
-    system2(reticulate::py_exe(), args = c("-c", "import tensorflow; print('ok')"), stdout = FALSE, stderr = FALSE)
-  }, error = function(e) {})
+
+  py_path <- tryCatch(reticulate::py_exe(), error = function(e) NULL)
+  invisible(py_path)
 }
 
 #' Get path to an example dataset (downloading on demand if needed)

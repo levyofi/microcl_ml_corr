@@ -12,3 +12,4 @@ outputs/
 run_example.R
 run_workflow.R
 vignettes/*.html
+keras.json

@@ -97,39 +97,8 @@ load_correction_model <- function(path) {
 }
 
 # ---- TensorFlow / Reticulate Setup ----
-
-# setup_tensorflow ---------------------------------------------------------------
-# Finds a Python environment with TensorFlow installed (searches the reticulate
-# uv cache) and sets RETICULATE_PYTHON before reticulate binds to Python.
-# Call this BEFORE library(reticulate) and py_require("tensorflow").
-setup_tensorflow <- function() {
-  if (nchar(Sys.getenv("RETICULATE_PYTHON")) > 0) return(invisible(NULL))
-
-  cache_root <- file.path(path.expand("~"), "Library", "Caches",
-                           "org.R-project.R", "R", "reticulate", "uv",
-                           "cache", "archive-v0")
-  if (!dir.exists(cache_root)) return(invisible(NULL))
-
-  # Find all python/python3 binaries in the reticulate uv cache
-  all_files  <- list.files(cache_root, recursive = TRUE, full.names = TRUE)
-  candidates <- all_files[grepl("/bin/python3?$", all_files)]
-
-  for (py in candidates) {
-    if (!file.access(py, 1) == 0) next   # not executable
-    has_tf <- tryCatch({
-      res <- suppressWarnings(
-        system2(py, c("-c", "import tensorflow; print('ok')"),
-                stdout = TRUE, stderr = FALSE))
-      any(grepl("ok", res))
-    }, error = function(e) FALSE)
-    if (has_tf) {
-      Sys.setenv(RETICULATE_PYTHON = py)
-      message("setup_tensorflow: using ", py)
-      return(invisible(py))
-    }
-  }
-  invisible(NULL)  # reticulate will find TF via py_require on its own
-}
+# setup_tensorflow is exported by microclCorr
+setup_tensorflow <- microclCorr::setup_tensorflow
 
 # ---- Data Splitting & Learning Curves ----
 
