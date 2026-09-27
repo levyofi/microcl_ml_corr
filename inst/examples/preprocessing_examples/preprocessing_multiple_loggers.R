@@ -14,8 +14,21 @@ library(microclCorr)
 
 # ── 1. Load NicheMapR predictions (one file for all loggers) ───────────────────
 
-script_dir <- dirname(rstudioapi::getSourceEditorContext()$path)
-nm_path    <- file.path(script_dir, "data", "example_nichemapr_multiple.csv")
+script_dir <- tryCatch({
+  cmd_args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", cmd_args, value = TRUE)
+  if (length(file_arg) > 0) {
+    dirname(normalizePath(sub("^--file=", "", file_arg[1])))
+  } else {
+    pkg_dir <- system.file("examples", "preprocessing_examples", package = "microclCorr")
+    if (nzchar(pkg_dir) && dir.exists(pkg_dir)) pkg_dir else getwd()
+  }
+}, error = function(e) {
+  pkg_dir <- system.file("examples", "preprocessing_examples", package = "microclCorr")
+  if (nzchar(pkg_dir) && dir.exists(pkg_dir)) pkg_dir else getwd()
+})
+
+nm_path <- file.path(script_dir, "data", "example_nichemapr_multiple.csv")
 nm <- read.csv(nm_path)
 nm$time <- as.POSIXct(nm$time, tz = "UTC")
 cat("NicheMapR rows:", nrow(nm), "| sites:", length(unique(nm$site_id)), "\n")
@@ -57,12 +70,16 @@ cat("Total pooled rows:", nrow(aligned_pooled),
 
 # ── 4. Save pooled file ─────────────────────────────────────────────────────────
 
-out_path <- file.path(script_dir, "data", "aligned_pooled.csv")
+out_dir <- file.path(script_dir, "data")
+if (!dir.exists(out_dir) || file.access(out_dir, 2) != 0) {
+  out_dir <- getwd()
+}
+out_path <- file.path(out_dir, "aligned_pooled.csv")
 write.csv(aligned_pooled, out_path, row.names = FALSE)
 cat("Pooled CSV saved to:", out_path, "\n")
 
 # ── 5. Verify with microclCorr loader ──────────────────────────────────────────
 
-data <- load_prepared_csv_data(out_path)
+data <- load_prepared_csv_data(out_path, includes_index = FALSE)
 cat("Loaded by microclCorr — rows:", nrow(data), "| columns:", ncol(data), "\n")
 cat("Sites in loaded data:", paste(unique(data$site_id), collapse = ", "), "\n")

@@ -14,7 +14,20 @@ library(microclCorr)
 
 # ── 1. Load the two raw files ──────────────────────────────────────────────────
 
-script_dir  <- dirname(rstudioapi::getSourceEditorContext()$path)
+script_dir <- tryCatch({
+  cmd_args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", cmd_args, value = TRUE)
+  if (length(file_arg) > 0) {
+    dirname(normalizePath(sub("^--file=", "", file_arg[1])))
+  } else {
+    pkg_dir <- system.file("examples", "preprocessing_examples", package = "microclCorr")
+    if (nzchar(pkg_dir) && dir.exists(pkg_dir)) pkg_dir else getwd()
+  }
+}, error = function(e) {
+  pkg_dir <- system.file("examples", "preprocessing_examples", package = "microclCorr")
+  if (nzchar(pkg_dir) && dir.exists(pkg_dir)) pkg_dir else getwd()
+})
+
 logger_path <- file.path(script_dir, "data", "example_logger_single.csv")
 nm_path     <- file.path(script_dir, "data", "example_nichemapr_single.csv")
 
@@ -44,11 +57,15 @@ print(summary(aligned$residual))
 
 # ── 5. Save aligned file ────────────────────────────────────────────────────────
 
-out_path <- file.path(script_dir, "data", "aligned_single.csv")
+out_dir <- file.path(script_dir, "data")
+if (!dir.exists(out_dir) || file.access(out_dir, 2) != 0) {
+  out_dir <- getwd()
+}
+out_path <- file.path(out_dir, "aligned_single.csv")
 write.csv(aligned, out_path, row.names = FALSE)
 cat("Aligned CSV saved to:", out_path, "\n")
 
 # ── 6. Verify with microclCorr loader ──────────────────────────────────────────
 
-data <- load_prepared_csv_data(out_path)
+data <- load_prepared_csv_data(out_path, includes_index = FALSE)
 cat("Loaded by microclCorr — rows:", nrow(data), "| columns:", ncol(data), "\n")
