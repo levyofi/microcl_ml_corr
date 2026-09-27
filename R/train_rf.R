@@ -19,18 +19,15 @@
 #' @param seed Random seed
 #' @return A fitted ranger model
 #' @examples
-#' \dontrun{
+#' data(microclimate_sample)
+#' feat_cols <- c("TAREF", "RH", "VREF", "SOLR")
 #' rf <- train_rf(
-#'   train_X        = splits$train[, feat_cols],
-#'   train_y        = splits$train$residual,
-#'   num_trees      = 500,
-#'   tune           = TRUE,
-#'   n_combinations = 5,
-#'   val_X          = splits$val[, feat_cols],
-#'   val_y          = splits$val$residual,
-#'   seed           = 42
+#'   train_X   = microclimate_sample[1:300, feat_cols],
+#'   train_y   = microclimate_sample$residual[1:300],
+#'   num_trees = 5,
+#'   tune      = FALSE
 #' )
-#' }
+#' rf$r.squared
 #' @export
 train_rf <- function(train_X, train_y,
                      num_trees = 500,

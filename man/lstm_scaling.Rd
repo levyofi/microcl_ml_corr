@@ -37,7 +37,8 @@ Performs MinMax scaling on feature columns. The scaler is fit only to
 the training data to avoid data leakage.
 }
 \examples{
-\dontrun{
+data(microclimate_sample)
+splits <- split_train_val_test(microclimate_sample, block_days = 2, seed = 42)
 scaled <- lstm_scaling(splits$train, splits$val, splits$test)
-}
+scaled$scaler$cols
 }

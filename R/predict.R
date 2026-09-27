@@ -15,14 +15,18 @@
 #' @param datetime_col Datetime column name (for LSTM windowing)
 #' @return Data.frame with base_prediction, correction, corrected_prediction
 #' @examples
-#' \dontrun{
+#' data(microclimate_sample)
+#' feat_cols <- c("TAREF", "RH", "VREF", "SOLR")
+#' rf <- train_rf(microclimate_sample[1:300, feat_cols],
+#'                microclimate_sample$residual[1:300],
+#'                num_trees = 5, tune = FALSE)
 #' corrected_rf <- correct_predictions(
 #'   model        = rf,
-#'   new_data     = splits$test,
+#'   new_data     = microclimate_sample[301:504, ],
 #'   model_type   = "rf",
 #'   feature_cols = feat_cols
 #' )
-#' }
+#' head(corrected_rf)
 #' @export
 correct_predictions <- function(model, new_data,
                                 model_type = c("rf", "lstm"),

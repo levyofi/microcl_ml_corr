@@ -129,9 +129,11 @@ add_cyclical_time <- function(df, datetime_col = "time", add_month = FALSE) {
 #' @param test_blocks Optional. Pre-defined test block indices.
 #' @return A list with elements: train, val, test (data.frames)
 #' @examples
-#' \dontrun{
-#' splits <- split_train_val_test(df, block_days = 7, seed = 42)
-#' }
+#' data(microclimate_sample)
+#' splits <- split_train_val_test(microclimate_sample, block_days = 2, seed = 42)
+#' nrow(splits$train)
+#' nrow(splits$val)
+#' nrow(splits$test)
 #' @export
 split_train_val_test <- function(data,
                                  train_pct = 0.75,
@@ -221,14 +223,18 @@ split_train_val_test <- function(data,
 #' @param seed Random seed
 #' @return List with train, val, test data.frames
 #' @examples
-#' \dontrun{
+#' data(microclimate_sample)
 #' splits_s <- stratified_split_train_val_test(
-#'   df,
+#'   microclimate_sample,
 #'   stratify_col = "time_series_doc",
-#'   block_days   = 7,
+#'   train_pct    = 0.6,
+#'   val_pct      = 0.2,
+#'   block_days   = 1,
 #'   seed         = 42
 #' )
-#' }
+#' nrow(splits_s$train)
+#' nrow(splits_s$val)
+#' nrow(splits_s$test)
 #' @export
 stratified_split_train_val_test <- function(data,
                                             train_pct = 0.75,
@@ -295,9 +301,10 @@ stratified_split_train_val_test <- function(data,
 #' @param prediction_col Prediction column name
 #' @return List with scaled train, val, test data.frames and scaler info
 #' @examples
-#' \dontrun{
+#' data(microclimate_sample)
+#' splits <- split_train_val_test(microclimate_sample, block_days = 2, seed = 42)
 #' scaled <- lstm_scaling(splits$train, splits$val, splits$test)
-#' }
+#' scaled$scaler$cols
 #' @export
 lstm_scaling <- function(train, val, test,
                          avoid_cols = .default_cols$avoid,
@@ -345,16 +352,18 @@ lstm_scaling <- function(train, val, test,
 #' @param max_gap_hours Maximum allowed gap in hours between consecutive points. NULL to disable.
 #' @return List with X (3D array), y, base_pred, datetime
 #' @examples
-#' \dontrun{
+#' data(microclimate_sample)
+#' feat_cols <- c("TAREF", "RH", "VREF", "SOLR")
 #' win <- make_windows(
-#'   X_mat         = as.matrix(site_a_train[, feat_cols]),
-#'   y_vec         = site_a_train$residual,
-#'   base_pred_vec = site_a_train$predicted,
-#'   datetime_vec  = site_a_train$time,
+#'   X_mat         = as.matrix(microclimate_sample[1:100, feat_cols]),
+#'   y_vec         = microclimate_sample$residual[1:100],
+#'   base_pred_vec = microclimate_sample$predicted[1:100],
+#'   datetime_vec  = microclimate_sample$time[1:100],
 #'   window_size   = 6,
 #'   max_gap_hours = 1
 #' )
-#' }
+#' dim(win$X)
+#' length(win$y)
 #' @export
 make_windows <- function(X_mat, y_vec, base_pred_vec, datetime_vec,
                          window_size, max_gap_hours = 1) {
@@ -521,13 +530,15 @@ one_dataset_lstm_preprocessing <- function(data_set, window_size, unique_ts_site
 #' @param ts_names_col Column with site/time-series identifiers
 #' @return List with train_dict, val_dict, test_dict, index_info
 #' @examples
-#' \dontrun{
+#' data(microclimate_sample)
+#' splits <- split_train_val_test(microclimate_sample, block_days = 2, seed = 42)
+#' scaled <- lstm_scaling(splits$train, splits$val, splits$test)
 #' lstm_data <- lstm_specific_preprocessing(
 #'   scaled$train, scaled$val, scaled$test,
-#'   window_size  = 6,
+#'   window_size  = 4,
 #'   ts_names_col = "time_series_doc"
 #' )
-#' }
+#' dim(lstm_data$train_dict$X)
 #' @export
 lstm_specific_preprocessing <- function(train, val, test, window_size,
                                         ts_names_col = "time_series_doc") {

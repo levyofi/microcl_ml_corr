@@ -37,12 +37,16 @@ Splits by shuffled N-day blocks, ensuring balanced representation
 across a stratification column (e.g., location or site).
 }
 \examples{
-\dontrun{
+data(microclimate_sample)
 splits_s <- stratified_split_train_val_test(
-  df,
+  microclimate_sample,
   stratify_col = "time_series_doc",
-  block_days   = 7,
+  train_pct    = 0.6,
+  val_pct      = 0.2,
+  block_days   = 1,
   seed         = 42
 )
-}
+nrow(splits_s$train)
+nrow(splits_s$val)
+nrow(splits_s$test)
 }

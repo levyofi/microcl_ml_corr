@@ -30,11 +30,13 @@ List with train_dict, val_dict, test_dict, index_info
 Creates windowed datasets for all three splits, tracking per-site indices.
 }
 \examples{
-\dontrun{
+data(microclimate_sample)
+splits <- split_train_val_test(microclimate_sample, block_days = 2, seed = 42)
+scaled <- lstm_scaling(splits$train, splits$val, splits$test)
 lstm_data <- lstm_specific_preprocessing(
   scaled$train, scaled$val, scaled$test,
-  window_size  = 6,
+  window_size  = 4,
   ts_names_col = "time_series_doc"
 )
-}
+dim(lstm_data$train_dict$X)
 }

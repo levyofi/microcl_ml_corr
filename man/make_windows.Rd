@@ -34,14 +34,16 @@ Rearranges time-series data into sliding windows of fixed size.
 Skips windows that contain temporal gaps larger than max_gap_hours.
 }
 \examples{
-\dontrun{
+data(microclimate_sample)
+feat_cols <- c("TAREF", "RH", "VREF", "SOLR")
 win <- make_windows(
-  X_mat         = as.matrix(site_a_train[, feat_cols]),
-  y_vec         = site_a_train$residual,
-  base_pred_vec = site_a_train$predicted,
-  datetime_vec  = site_a_train$time,
+  X_mat         = as.matrix(microclimate_sample[1:100, feat_cols]),
+  y_vec         = microclimate_sample$residual[1:100],
+  base_pred_vec = microclimate_sample$predicted[1:100],
+  datetime_vec  = microclimate_sample$time[1:100],
   window_size   = 6,
   max_gap_hours = 1
 )
-}
+dim(win$X)
+length(win$y)
 }

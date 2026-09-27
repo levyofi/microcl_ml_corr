@@ -13,15 +13,20 @@
 #' @param model_type Character: "rf" or "lstm"
 #' @return A list with rmse_base, rmse_corr, r2_base, r2_corr
 #' @examples
-#' \dontrun{
+#' data(microclimate_sample)
+#' feat_cols <- c("TAREF", "RH", "VREF", "SOLR")
+#' rf <- train_rf(microclimate_sample[1:300, feat_cols],
+#'                microclimate_sample$residual[1:300],
+#'                num_trees = 5, tune = FALSE)
 #' metrics <- evaluate_correction(
 #'   model           = rf,
-#'   X               = splits$test[, feat_cols],
-#'   y               = splits$test$residual,
-#'   base_prediction = splits$test$predicted,
+#'   X               = microclimate_sample[301:504, feat_cols],
+#'   y               = microclimate_sample$residual[301:504],
+#'   base_prediction = microclimate_sample$predicted[301:504],
 #'   model_type      = "rf"
 #' )
-#' }
+#' metrics$rmse_base
+#' metrics$rmse_corr
 #' @export
 evaluate_correction <- function(model, X, y, base_prediction,
                                 model_type = c("rf", "lstm")) {
