@@ -7,6 +7,7 @@
 save_correction_model <- microclCorr::save_correction_model
 load_correction_model <- microclCorr::load_correction_model
 setup_tensorflow      <- microclCorr::setup_tensorflow
+check_lstm_environment <- microclCorr::check_lstm_environment
 
 # ---- Data Splitting & Learning Curves ----
 

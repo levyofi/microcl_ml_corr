@@ -10,7 +10,7 @@ if (file.exists("R/utils.R")) {
 Sys.setenv(UV_OFFLINE = "1", KERAS_HOME = normalizePath(file.path(root)))
 source(file.path(root, "R/utils.R"))
 source(file.path(root, "inst/examples/examples_utility_functions.R"))
-setup_tensorflow()
+check_lstm_environment()
 library(microclCorr)
 library(ggplot2)
 library(ggpubr)

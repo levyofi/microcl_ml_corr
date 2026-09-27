@@ -3,6 +3,7 @@
 export(add_cyclical_time)
 export(align_test_sets)
 export(build_lstm)
+export(check_lstm_environment)
 export(correct_predictions)
 export(evaluate_correction)
 export(get_example_data)

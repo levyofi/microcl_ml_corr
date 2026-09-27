@@ -22,52 +22,74 @@
   }
 }
 
-#' Check if keras3 and required backend are installed without auto-installing packages
-#' @param check_backend Logical. Whether to verify the Python backend is available.
-#' @keywords internal
-check_keras3 <- function(check_backend = TRUE) {
+#' Check if LSTM environment and required packages are configured
+#'
+#' Checks whether the required R packages (\code{reticulate}, \code{tensorflow},
+#' and \code{keras3}) and a Python environment with TensorFlow and Keras are
+#' installed and available. If any component is missing, it stops execution
+#' with an informative message instructing the user to run \code{\link{setup_tensorflow}}.
+#' Does NOT automatically install packages.
+#'
+#' @return Invisible TRUE if the environment is ready.
+#' @examples
+#' \dontrun{
+#'   check_lstm_environment()
+#' }
+#' @export
+check_lstm_environment <- function() {
   # Explicitly ensure auto-configuration and auto-downloading are disabled
   Sys.setenv(RETICULATE_AUTOCONFIGURE = "FALSE")
   Sys.setenv(RETICULATE_USE_MANAGED_VENV = "no")
 
-  if (!requireNamespace("keras3", quietly = TRUE) ||
-      !requireNamespace("reticulate", quietly = TRUE) ||
-      !requireNamespace("tensorflow", quietly = TRUE)) {
+  missing_pkgs <- c()
+  if (!requireNamespace("reticulate", quietly = TRUE)) missing_pkgs <- c(missing_pkgs, "reticulate")
+  if (!requireNamespace("tensorflow", quietly = TRUE)) missing_pkgs <- c(missing_pkgs, "tensorflow")
+  if (!requireNamespace("keras3", quietly = TRUE))     missing_pkgs <- c(missing_pkgs, "keras3")
+
+  if (length(missing_pkgs) > 0) {
     stop(
-      "LSTM models require a configured TensorFlow environment.\n",
-      "Please run setup_tensorflow() first to configure your TensorFlow environment.",
+      "Running LSTM models requires the following R packages: ",
+      paste(missing_pkgs, collapse = ", "), ".\n",
+      "Please run setup_tensorflow() first to install and configure your environment.",
       call. = FALSE
     )
   }
 
-  if (check_backend) {
-    has_backend <- tryCatch({
-      if (!reticulate::py_available(initialize = TRUE)) return(FALSE)
-      reticulate::py_module_available("keras") || reticulate::py_module_available("tensorflow")
-    }, error = function(e) FALSE)
-
-    if (!has_backend) {
-      stop(
-        "A Python environment with 'keras' or 'tensorflow' is required for LSTM operations, but none is currently configured.\n",
-        "Please run setup_tensorflow() first to configure your TensorFlow environment.",
-        call. = FALSE
-      )
+  # If RETICULATE_PYTHON is not set, check if microcl_env exists
+  if (Sys.getenv("RETICULATE_PYTHON") == "" && reticulate::virtualenv_exists("microcl_env")) {
+    py <- tryCatch(reticulate::virtualenv_python("microcl_env"), error = function(e) NULL)
+    if (!is.null(py) && file.exists(py)) {
+      Sys.setenv(RETICULATE_PYTHON = py)
     }
   }
+
+  has_backend <- tryCatch({
+    if (!reticulate::py_available(initialize = TRUE)) return(FALSE)
+    reticulate::py_module_available("keras") || reticulate::py_module_available("tensorflow")
+  }, error = function(e) FALSE)
+
+  if (!has_backend) {
+    stop(
+      "A Python environment with 'tensorflow' and 'keras' is required to run LSTM models.\n",
+      "Please run setup_tensorflow() first to configure and install your TensorFlow environment.",
+      call. = FALSE
+    )
+  }
+
+  invisible(TRUE)
+}
+
+#' Check if keras3 and required backend are installed without auto-installing packages
+#' @param check_backend Logical. Whether to verify the Python backend is available.
+#' @keywords internal
+check_keras3 <- function(check_backend = TRUE) {
+  check_lstm_environment()
 }
 
 #' Check if tensorflow is installed
 #' @keywords internal
 check_tensorflow <- function() {
-  if (!requireNamespace("tensorflow", quietly = TRUE) ||
-      !requireNamespace("reticulate", quietly = TRUE) ||
-      !requireNamespace("keras3", quietly = TRUE)) {
-    stop(
-      "LSTM models require a configured TensorFlow environment.\n",
-      "Please run setup_tensorflow() first to configure your TensorFlow environment.",
-      call. = FALSE
-    )
-  }
+  check_lstm_environment()
 }
 
 #' Save a correction model to disk

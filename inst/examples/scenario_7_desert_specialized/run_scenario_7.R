@@ -17,7 +17,7 @@
 # =============================================================================
 
 source(system.file("examples", "examples_utility_functions.R", package = "microclCorr"))
-setup_tensorflow()
+check_lstm_environment()
 library(microclCorr)
 
 # ── Settings ──────────────────────────────────────────────────────────────────

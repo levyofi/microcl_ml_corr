@@ -23,6 +23,20 @@ df <- microclimate_sample
 
 ## Environment Setup
 
+### `check_lstm_environment()`
+
+Verifies that the required R packages (`reticulate`, `tensorflow`, `keras3`) and a Python environment with TensorFlow and Keras are installed and available. If any component is missing, it halts execution and instructs the user to run `setup_tensorflow()`. Does not automatically install packages.
+
+**Parameters** None.
+
+**Returns** Invisible `TRUE` if the environment is ready.
+
+**Example**
+
+```r
+check_lstm_environment()
+```
+
 ### `setup_tensorflow()`
 
 Configures a Python environment with TensorFlow and Keras, and sets environment variables (`RETICULATE_PYTHON`, `KERAS_HOME`) before `reticulate` binds to Python. Installs any missing required R packages (`reticulate`, `tensorflow`, `keras3`) and creates/configures a virtual environment (`microcl_env`) with TensorFlow and Keras if no existing environment is found.
