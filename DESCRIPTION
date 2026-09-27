@@ -14,15 +14,14 @@ Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 8.1.0
 Imports:
-    ranger,
-    keras3,
-    tensorflow,
-    stats
+    ranger
 Suggests:
     testthat (>= 3.0.0),
     knitr,
     rmarkdown,
-    reticulate
+    reticulate,
+    keras3,
+    tensorflow
 Config/testthat/edition: 3
 VignetteBuilder: knitr
 Depends:

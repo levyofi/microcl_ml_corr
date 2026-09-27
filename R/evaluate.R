@@ -31,6 +31,7 @@ evaluate_correction <- function(model, X, y, base_prediction,
   if (model_type == "rf") {
     pred_res <- stats::predict(model, data = as.data.frame(X))$predictions
   } else {
+    check_keras3()
     pred_res <- as.numeric(model |> keras3::predict_on_batch(X))
   }
 

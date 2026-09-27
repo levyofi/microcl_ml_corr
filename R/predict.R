@@ -51,6 +51,7 @@ correct_predictions <- function(model, new_data,
     )
 
   } else {
+    check_keras3()
     # LSTM: need to scale and window
     scaled_data <- new_data
     if (!is.null(scaler)) {

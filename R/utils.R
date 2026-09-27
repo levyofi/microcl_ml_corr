@@ -12,6 +12,31 @@
                    "location", "site_id")
 )
 
+#' Check if keras3 is installed
+#' @keywords internal
+check_keras3 <- function() {
+  if (!requireNamespace("keras3", quietly = TRUE)) {
+    stop(
+      "Package 'keras3' is required to build, train, evaluate, or load LSTM models.\n",
+      "Please install it using: install.packages('keras3')\n",
+      "and configure Keras with: keras3::install_keras()",
+      call. = FALSE
+    )
+  }
+}
+
+#' Check if tensorflow is installed
+#' @keywords internal
+check_tensorflow <- function() {
+  if (!requireNamespace("tensorflow", quietly = TRUE)) {
+    stop(
+      "Package 'tensorflow' is required for TensorFlow operations.\n",
+      "Please install it using: install.packages('tensorflow')",
+      call. = FALSE
+    )
+  }
+}
+
 #' Save a correction model to disk
 #'
 #' @param model Trained model (ranger or keras)
@@ -41,6 +66,7 @@ load_correction_model <- function(path) {
   if (obj$model_type == "lstm" || (is.character(obj$model) && length(obj$model) > 0)) {
     keras_path <- sub("\\.rds$", ".keras", path)
     if (file.exists(keras_path)) {
+      check_keras3()
       obj$model <- keras3::load_model(keras_path)
     }
   }

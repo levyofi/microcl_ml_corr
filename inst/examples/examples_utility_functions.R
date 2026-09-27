@@ -22,6 +22,23 @@
 #' saved to a temporary .keras file, read as raw bytes, and embedded into the 
 #' .rds file so they can be reloaded seamlessly as a single file by any user.
 #'
+check_keras3 <- function() {
+  if (!requireNamespace("keras3", quietly = TRUE)) {
+    stop(
+      "Package 'keras3' is required to build, train, evaluate, or load LSTM models.\n",
+      "Please install it using: install.packages('keras3')\n",
+      "and configure Keras with: keras3::install_keras()",
+      call. = FALSE
+    )
+  }
+}
+
+#' Save a correction model to disk
+#'
+#' RF models are saved entirely in the .rds file. Keras (LSTM) models are
+#' saved to a temporary .keras file, read as raw bytes, and embedded into the 
+#' .rds file so they can be reloaded seamlessly as a single file by any user.
+#'
 #' @param model Trained model (ranger or keras)
 #' @param scaler List with min/max from scaling
 #' @param feature_cols Character vector of feature column names
@@ -32,6 +49,7 @@ save_correction_model <- function(model, scaler, feature_cols, path) {
 
   keras_bytes <- NULL
   if (!is_rf) {
+    check_keras3()
     keras_tmp <- tempfile(fileext = ".keras")
     keras3::save_model(model, keras_tmp)
     keras_bytes <- readBin(keras_tmp, "raw", file.info(keras_tmp)$size)
@@ -57,6 +75,7 @@ save_correction_model <- function(model, scaler, feature_cols, path) {
 load_correction_model <- function(path) {
   obj <- readRDS(path)
   if (identical(obj$model_type, "lstm")) {
+    check_keras3()
     keras_path <- sub("\\.rds$", ".keras", path)
     if (file.exists(keras_path)) {
       obj$model <- keras3::load_model(keras_path)

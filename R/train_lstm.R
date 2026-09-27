@@ -19,6 +19,7 @@ build_lstm <- function(input_shape,
                        dropout = 0.1,
                        lr = 0.001) {
 
+  check_keras3()
   model <- keras3::keras_model_sequential(input_shape = input_shape)
 
   for (i in seq_len(n_layers)) {
@@ -100,6 +101,9 @@ train_lstm <- function(train_X, train_y,
                        patience = 10,
                        seed = 42) {
 
+  check_keras3()
+  check_tensorflow()
+
   # Set seeds for reproducibility
   tensorflow::tf$random$set_seed(as.integer(seed))
   set.seed(seed)
@@ -163,6 +167,8 @@ lstm_hypertuning <- function(train_X, train_y, val_X, val_y,
                              patience = 10,
                              seed = 123) {
 
+  check_keras3()
+  check_tensorflow()
   set.seed(seed)
 
   best_val_loss <- Inf
