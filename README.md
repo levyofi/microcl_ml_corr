@@ -152,17 +152,7 @@ library(microclCorr)
 setup_tensorflow()
 ```
 
-`setup_tensorflow()` automatically discovers an existing Python environment with TensorFlow configured (such as an active Conda environment, a virtual environment, or `RETICULATE_PYTHON`).
-
-If you do not yet have TensorFlow installed in Python, you can install it manually in your shell:
-```bash
-pip install tensorflow keras
-```
-or inside R using:
-```R
-reticulate::virtualenv_create("microcl_env", packages = c("tensorflow", "keras"))
-setup_tensorflow()
-```
+`setup_tensorflow()` automatically discovers an existing Python environment with TensorFlow configured (such as an active Conda environment, a virtual environment, or `RETICULATE_PYTHON`). If not already available, it installs any missing required R packages (`reticulate`, `tensorflow`, `keras3`) and configures a dedicated virtual environment with TensorFlow and Keras.
 
 ---
 

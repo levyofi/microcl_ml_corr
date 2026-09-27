@@ -9,8 +9,6 @@
 
 source(system.file("examples", "examples_utility_functions.R", package = "microclCorr"))
 setup_tensorflow()
-library(reticulate)
-py_require("tensorflow")
 library(microclCorr)
 
 # ── Settings ──────────────────────────────────────────────────────────────────

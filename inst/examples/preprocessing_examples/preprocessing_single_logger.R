@@ -55,5 +55,5 @@ cat("Aligned CSV saved to:", out_path, "\n")
 
 # ── 6. Verify with microclCorr loader ──────────────────────────────────────────
 
-data <- load_prepared_csv_data(out_path, includes_index = FALSE)
-cat("Loaded by microclCorr — rows:", nrow(data), "| columns:", ncol(data), "\n")
+loaded_df <- load_prepared_csv_data(out_path, includes_index = FALSE)
+cat("Loaded by microclCorr — rows:", nrow(loaded_df), "| columns:", ncol(loaded_df), "\n")

@@ -4,22 +4,26 @@
 \alias{setup_tensorflow}
 \title{Setup Tensorflow environment}
 \usage{
-setup_tensorflow()
+setup_tensorflow(envname = "microcl_env", install_if_missing = TRUE)
+}
+\arguments{
+\item{envname}{Name of the virtual environment to use or create (default: "microcl_env").}
+
+\item{install_if_missing}{Logical. If TRUE (default), automatically installs missing
+required R packages and creates/installs the Python virtual environment if needed.}
 }
 \value{
 Invisible file path to the Python executable, or NULL.
 }
 \description{
-Finds an existing Python environment with TensorFlow and Keras configured,
-and sets environment variables before reticulate binds to Python.
-Does NOT automatically install packages or create virtual environments.
+Configures a Python environment with TensorFlow and Keras. Installs any
+missing required R packages (reticulate, tensorflow, keras3) and creates/configures
+a dedicated virtual environment with TensorFlow and Keras if no existing
+environment is found.
 }
 \examples{
 \dontrun{
-if (requireNamespace("reticulate", quietly = TRUE) &&
-    requireNamespace("tensorflow", quietly = TRUE)) {
   setup_tensorflow()
-}
 }
 }
 
