@@ -117,12 +117,10 @@ rf_model <- train_rf(
 
 #### LSTM Neural Network
 
-LSTM models capture temporal memory and thermal inertia. Because LSTM models rely on TensorFlow and Keras via `reticulate`, declare TensorFlow at the start of your R session (especially in RStudio):
+LSTM models capture temporal memory and thermal inertia. Because LSTM models rely on TensorFlow and Keras via `reticulate`, configure TensorFlow at the start of your R session:
 
 ```{r eval = FALSE}
-library(reticulate)
-py_require("tensorflow")
-# Alternatively: microclCorr::setup_tensorflow()
+setup_tensorflow()
 ```
 
 Data are scaled and structured into fixed sliding sequence windows before model training:
@@ -347,10 +345,8 @@ head(corrected_output)
 For datasets with strong temporal autocorrelation or thermal inertia, an LSTM network can be tuned and compared directly against Random Forest using the same synthetic dataset:
 
 ```{r lstm-reproducible-example, eval = FALSE}
-# 0. Ensure TensorFlow is declared at the start of your R session
-library(reticulate)
-py_require("tensorflow")
-# Alternatively: microclCorr::setup_tensorflow()
+# 0. Configure Python and TensorFlow environment
+setup_tensorflow()
 
 # 1. Feature normalization (min-max scaling fit on training set)
 scaled <- lstm_scaling(splits$train, splits$val, splits$test)

@@ -156,18 +156,23 @@ install.packages(c("ranger", "reticulate"))
 
 ### 3. Set up TensorFlow (required for LSTM models only)
 
-The LSTM model uses Python's TensorFlow library under the hood. To set it up:
+The LSTM model uses Python's TensorFlow library under the hood. To configure your environment for TensorFlow:
 
 ```R
-library(keras3)
-install_keras()   # automatically installs TensorFlow in a virtual environment
+library(microclCorr)
+setup_tensorflow()
 ```
 
-If you already have a conda environment with TensorFlow installed, point R to it:
+`setup_tensorflow()` automatically discovers an existing Python environment with TensorFlow configured (such as an active Conda environment, a virtual environment, or `RETICULATE_PYTHON`).
 
+If you do not yet have TensorFlow installed in Python, you can install it manually in your shell:
+```bash
+pip install tensorflow keras
+```
+or inside R using:
 ```R
-library(reticulate)
-use_condaenv("your_env_name", required = TRUE)
+reticulate::virtualenv_create("microcl_env", packages = c("tensorflow", "keras"))
+setup_tensorflow()
 ```
 
 ---
