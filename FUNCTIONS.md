@@ -92,16 +92,14 @@ Reads a pre-aligned CSV, parses the datetime column, and one-hot encodes a categ
 
 ```r
 # Load real-world field logger data directly
-csv_path <- get_example_data("Harod_dataset.csv")
-df_harod <- load_prepared_csv_data(
-  csv_path,
-  is_continuous_microhabitat = FALSE,
-  datetime_format = "%d/%m/%Y %H:%M",
-  includes_index  = TRUE
-)
+csv_path <- get_example_data("desert_data_preprocessed.csv")
+loaded <- load_prepared_csv_data(csv_path)
 
-# New one-hot columns: microhabitat_sun, microhabitat_shade, microhabitat_air
-head(df_harod[, c("time", "microhabitat", "predicted", "residual")])
+# (For datasets with custom datetime formatting, pass datetime_format:
+#  harod_path <- get_example_data("Harod_dataset.csv")
+#  harod_df   <- load_prepared_csv_data(harod_path, datetime_format = "%d/%m/%Y %H:%M"))
+
+head(loaded[, c("time", "microhabitat", "predicted", "residual")])
 ```
 
 ---

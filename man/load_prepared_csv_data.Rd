@@ -34,11 +34,7 @@ Loads a CSV produced by the data alignment pipeline and prepares it
 for ML training: parses datetime, one-hot encodes categorical microhabitat.
 }
 \examples{
-data(microclimate_sample)
-tmp <- tempfile(fileext = ".csv")
-write.csv(microclimate_sample, tmp, row.names = TRUE)
-loaded <- load_prepared_csv_data(tmp, datetime_format = "\%d/\%m/\%Y \%H:\%M", includes_index = TRUE)
+csv_path <- get_example_data("desert_data_preprocessed.csv")
+loaded <- load_prepared_csv_data(csv_path)
 head(loaded[, c("time", "microhabitat", "predicted", "residual")])
-unlink(tmp)
 }
-

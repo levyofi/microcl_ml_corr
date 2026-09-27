@@ -58,7 +58,6 @@ Performs a simple random search over LSTM hyperparameters.
 if (requireNamespace("keras3", quietly = TRUE) &&
     requireNamespace("tensorflow", quietly = TRUE)) {
   data(microclimate_sample)
-  microclimate_sample$time <- as.POSIXct(microclimate_sample$time, format = "\%d/\%m/\%Y \%H:\%M", tz = "UTC")
   splits <- split_train_val_test(microclimate_sample, train_pct = 0.6, val_pct = 0.2, block_days = 2, seed = 42)
   scaled <- lstm_scaling(splits$train, splits$val, splits$test)
   lstm_data <- lstm_specific_preprocessing(scaled$train, scaled$val, scaled$test,
