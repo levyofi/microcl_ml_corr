@@ -19,7 +19,7 @@ Suggests:
     testthat (>= 3.0.0),
     knitr,
     rmarkdown,
-    reticulate,
+    reticulate (>= 1.42.0),
     keras3,
     tensorflow
 Config/testthat/edition: 3

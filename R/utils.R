@@ -46,6 +46,20 @@ check_lstm_environment <- function() {
   if (!requireNamespace("tensorflow", quietly = TRUE)) missing_pkgs <- c(missing_pkgs, "tensorflow")
   if (!requireNamespace("keras3", quietly = TRUE))     missing_pkgs <- c(missing_pkgs, "keras3")
 
+  if (requireNamespace("reticulate", quietly = TRUE)) {
+    retic_ver <- tryCatch(utils::packageVersion("reticulate"), error = function(e) NULL)
+    if (!is.null(retic_ver) && retic_ver < "1.42.0") {
+      stop(
+        "Package 'reticulate' version ", as.character(retic_ver),
+        " is installed/loaded, but version >= 1.42.0 is required by 'tensorflow' and 'keras3'.\n",
+        "Please run:\n",
+        "  install.packages('reticulate')\n",
+        "and RESTART your R session before proceeding.",
+        call. = FALSE
+      )
+    }
+  }
+
   if (length(missing_pkgs) > 0) {
     stop(
       "Running LSTM models requires the following R packages: ",
@@ -202,8 +216,16 @@ setup_tensorflow <- function(envname = "microcl_env", install_if_missing = TRUE)
   Sys.setenv(RETICULATE_AUTOCONFIGURE = "FALSE")
   Sys.setenv(RETICULATE_USE_MANAGED_VENV = "no")
 
+  retic_outdated <- FALSE
+  if (requireNamespace("reticulate", quietly = TRUE)) {
+    retic_ver <- tryCatch(utils::packageVersion("reticulate"), error = function(e) NULL)
+    if (!is.null(retic_ver) && retic_ver < "1.42.0") {
+      retic_outdated <- TRUE
+    }
+  }
+
   missing_r_pkgs <- c()
-  if (!requireNamespace("reticulate", quietly = TRUE)) missing_r_pkgs <- c(missing_r_pkgs, "reticulate")
+  if (!requireNamespace("reticulate", quietly = TRUE) || retic_outdated) missing_r_pkgs <- c(missing_r_pkgs, "reticulate")
   if (!requireNamespace("tensorflow", quietly = TRUE)) missing_r_pkgs <- c(missing_r_pkgs, "tensorflow")
   if (!requireNamespace("keras3", quietly = TRUE))     missing_r_pkgs <- c(missing_r_pkgs, "keras3")
 
@@ -249,6 +271,12 @@ setup_tensorflow <- function(envname = "microcl_env", install_if_missing = TRUE)
           "If permissions are needed, create a personal library or install via your system package manager.",
           call. = FALSE
         )
+      }
+
+      if (retic_outdated && isNamespaceLoaded("reticulate")) {
+        message("\n*** NOTE: Package 'reticulate' was updated to >= 1.42.0. ***")
+        message("*** Because an older version was already loaded in this R session, ***")
+        message("*** please RESTART YOUR R SESSION for the update to take effect. ***\n")
       }
     } else {
       stop(
