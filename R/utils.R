@@ -209,8 +209,47 @@ setup_tensorflow <- function(envname = "microcl_env", install_if_missing = TRUE)
 
   if (length(missing_r_pkgs) > 0) {
     if (isTRUE(install_if_missing)) {
+      # Determine a writable library path (crucial on Ubuntu/Linux where default site-library is not writable)
+      user_lib <- .libPaths()[1]
+      if (file.access(user_lib, 2) != 0) {
+        user_lib <- Sys.getenv("R_LIBS_USER")
+        if (!nzchar(user_lib)) {
+          user_lib <- file.path(path.expand("~"), "R",
+                                paste0(R.version$platform, "-library"),
+                                paste(R.version$major, substr(R.version$minor, 1, 1), sep = "."))
+        }
+        if (!dir.exists(user_lib)) {
+          dir.create(user_lib, recursive = TRUE, showWarnings = FALSE)
+        }
+        if (!user_lib %in% .libPaths()) {
+          .libPaths(c(user_lib, .libPaths()))
+        }
+      }
+
+      repos <- getOption("repos")
+      if (is.null(repos) || !nzchar(repos["CRAN"]) || repos["CRAN"] == "@CRAN@") {
+        repos <- c(CRAN = "https://cloud.r-project.org")
+      }
+
       message("setup_tensorflow: installing missing R packages (", paste(missing_r_pkgs, collapse = ", "), ")...")
-      utils::install.packages(missing_r_pkgs, repos = "https://cloud.r-project.org")
+      utils::install.packages(missing_r_pkgs, lib = user_lib, repos = repos)
+
+      still_missing <- c()
+      for (pkg in missing_r_pkgs) {
+        if (!requireNamespace(pkg, lib.loc = .libPaths(), quietly = TRUE)) {
+          still_missing <- c(still_missing, pkg)
+        }
+      }
+      if (length(still_missing) > 0) {
+        stop(
+          "setup_tensorflow was unable to install the following R packages: ",
+          paste(still_missing, collapse = ", "), ".\n",
+          "Please install them manually in your R console using:\n",
+          "  install.packages(c(", paste(sprintf("'%s'", still_missing), collapse = ", "), "))\n",
+          "If permissions are needed, create a personal library or install via your system package manager.",
+          call. = FALSE
+        )
+      }
     } else {
       stop(
         "The following R packages are required for LSTM operations but are not installed: ",
@@ -229,104 +268,113 @@ setup_tensorflow <- function(envname = "microcl_env", install_if_missing = TRUE)
     Sys.setenv(KERAS_HOME = k_dir)
   }
 
+  py <- NULL
   if (nzchar(Sys.getenv("RETICULATE_PYTHON"))) {
-    return(invisible(Sys.getenv("RETICULATE_PYTHON")))
-  }
-
-  # 1. Check existing virtual environment (envname)
-  if (reticulate::virtualenv_exists(envname)) {
-    py <- tryCatch(reticulate::virtualenv_python(envname), error = function(e) NULL)
-    if (!is.null(py) && file.exists(py)) {
+    py <- Sys.getenv("RETICULATE_PYTHON")
+  } else if (reticulate::virtualenv_exists(envname)) {
+    cand_py <- tryCatch(reticulate::virtualenv_python(envname), error = function(e) NULL)
+    if (!is.null(cand_py) && file.exists(cand_py)) {
       has_tf <- tryCatch({
         res <- suppressWarnings(
-          system2(py, args = c("-c", "\"import tensorflow\""),
+          system2(cand_py, args = c("-c", "\"import tensorflow\""),
                   stdout = FALSE, stderr = FALSE))
         identical(res, 0L)
       }, error = function(e) FALSE)
       if (has_tf) {
+        py <- cand_py
         Sys.setenv(RETICULATE_PYTHON = py)
         message("setup_tensorflow: using virtualenv '", envname, "' (", py, ")")
-        return(invisible(py))
       } else if (isTRUE(install_if_missing)) {
         message("setup_tensorflow: installing tensorflow into virtual environment '", envname, "'...")
         tryCatch({
           reticulate::virtualenv_install(envname, packages = c("tensorflow", "keras"))
+          py <- cand_py
           Sys.setenv(RETICULATE_PYTHON = py)
           message("setup_tensorflow: successfully configured virtualenv '", envname, "' (", py, ")")
-          return(invisible(py))
         }, error = function(e) NULL)
       }
     }
   }
 
-  # 2. Check conda environments if conda is available
-  conda_envs <- tryCatch(reticulate::conda_list(), error = function(e) NULL)
-  if (!is.null(conda_envs) && nrow(conda_envs) > 0) {
-    for (i in seq_len(nrow(conda_envs))) {
-      py <- conda_envs$python[i]
-      if (file.exists(py) && file.access(py, 1) == 0) {
-        has_tf <- tryCatch({
-          res <- suppressWarnings(
-            system2(py, args = c("-c", "\"import tensorflow\""),
-                    stdout = FALSE, stderr = FALSE))
-          identical(res, 0L)
-        }, error = function(e) FALSE)
-        if (has_tf) {
-          Sys.setenv(RETICULATE_PYTHON = py)
-          message("setup_tensorflow: using conda environment '", conda_envs$name[i], "' (", py, ")")
-          return(invisible(py))
+  if (is.null(py)) {
+    # 2. Check conda environments if conda is available
+    conda_envs <- tryCatch(reticulate::conda_list(), error = function(e) NULL)
+    if (!is.null(conda_envs) && nrow(conda_envs) > 0) {
+      for (i in seq_len(nrow(conda_envs))) {
+        cand_py <- conda_envs$python[i]
+        if (file.exists(cand_py) && file.access(cand_py, 1) == 0) {
+          has_tf <- tryCatch({
+            res <- suppressWarnings(
+              system2(cand_py, args = c("-c", "\"import tensorflow\""),
+                      stdout = FALSE, stderr = FALSE))
+            identical(res, 0L)
+          }, error = function(e) FALSE)
+          if (has_tf) {
+            py <- cand_py
+            Sys.setenv(RETICULATE_PYTHON = py)
+            message("setup_tensorflow: using conda environment '", conda_envs$name[i], "' (", py, ")")
+            break
+          }
         }
       }
     }
   }
 
-  # 3. Check reticulate cache if present
-  cache_root <- file.path(path.expand("~"), "Library", "Caches",
-                          "org.R-project.R", "R", "reticulate", "uv",
-                          "cache", "archive-v0")
-  if (dir.exists(cache_root)) {
-    all_files  <- list.files(cache_root, recursive = TRUE, full.names = TRUE)
-    candidates <- all_files[grepl("/bin/python3?$", all_files)]
-    for (py in candidates) {
-      if (file.access(py, 1) == 0) {
-        has_tf <- tryCatch({
-          res <- suppressWarnings(
-            system2(py, args = c("-c", "\"import tensorflow\""),
-                    stdout = FALSE, stderr = FALSE))
-          identical(res, 0L)
-        }, error = function(e) FALSE)
-        if (has_tf) {
-          Sys.setenv(RETICULATE_PYTHON = py)
-          message("setup_tensorflow: using cached python ", py)
-          return(invisible(py))
+  if (is.null(py)) {
+    # 3. Check reticulate cache if present
+    cache_root <- file.path(path.expand("~"), "Library", "Caches",
+                            "org.R-project.R", "R", "reticulate", "uv",
+                            "cache", "archive-v0")
+    if (dir.exists(cache_root)) {
+      all_files  <- list.files(cache_root, recursive = TRUE, full.names = TRUE)
+      candidates <- all_files[grepl("/bin/python3?$", all_files)]
+      for (cand_py in candidates) {
+        if (file.access(cand_py, 1) == 0) {
+          has_tf <- tryCatch({
+            res <- suppressWarnings(
+              system2(cand_py, args = c("-c", "\"import tensorflow\""),
+                      stdout = FALSE, stderr = FALSE))
+            identical(res, 0L)
+          }, error = function(e) FALSE)
+          if (has_tf) {
+            py <- cand_py
+            Sys.setenv(RETICULATE_PYTHON = py)
+            message("setup_tensorflow: using cached python ", py)
+            break
+          }
         }
       }
     }
   }
 
-  # 4. If no existing environment with TensorFlow was found, install or stop with instructions
-  if (isTRUE(install_if_missing)) {
-    message("setup_tensorflow: creating virtual environment '", envname, "' with tensorflow and keras...")
-    reticulate::virtualenv_create(envname, packages = c("tensorflow", "keras"))
-    py <- reticulate::virtualenv_python(envname)
-    Sys.setenv(RETICULATE_PYTHON = py)
-    message("setup_tensorflow: successfully configured virtualenv '", envname, "' (", py, ")")
-    return(invisible(py))
+  if (is.null(py)) {
+    # 4. If no existing environment with TensorFlow was found, install or stop with instructions
+    if (isTRUE(install_if_missing)) {
+      message("setup_tensorflow: creating virtual environment '", envname, "' with tensorflow and keras...")
+      reticulate::virtualenv_create(envname, packages = c("tensorflow", "keras"))
+      py <- reticulate::virtualenv_python(envname)
+      Sys.setenv(RETICULATE_PYTHON = py)
+      message("setup_tensorflow: successfully configured virtualenv '", envname, "' (", py, ")")
+    } else {
+      stop(
+        "No existing Python environment with 'tensorflow' was found.\n",
+        "Please run setup_tensorflow() with install_if_missing = TRUE or configure manually:\n",
+        "  1. If you already have an environment with TensorFlow/Keras:\n",
+        "     Sys.setenv(RETICULATE_PYTHON = '/path/to/python')\n",
+        "     or in R: reticulate::use_condaenv('your_env')\n",
+        "     or in R: reticulate::use_virtualenv('your_env')\n\n",
+        "  2. To create/install TensorFlow in a virtual environment manually:\n",
+        "     reticulate::virtualenv_create('", envname, "', packages = c('tensorflow', 'keras'))\n",
+        "     reticulate::use_virtualenv('", envname, "')\n",
+        "     or in shell terminal: pip install tensorflow keras\n",
+        call. = FALSE
+      )
+    }
   }
 
-  stop(
-    "No existing Python environment with 'tensorflow' was found.\n",
-    "Please run setup_tensorflow() with install_if_missing = TRUE or configure manually:\n",
-    "  1. If you already have an environment with TensorFlow/Keras:\n",
-    "     Sys.setenv(RETICULATE_PYTHON = '/path/to/python')\n",
-    "     or in R: reticulate::use_condaenv('your_env')\n",
-    "     or in R: reticulate::use_virtualenv('your_env')\n\n",
-    "  2. To create/install TensorFlow in a virtual environment manually:\n",
-    "     reticulate::virtualenv_create('", envname, "', packages = c('tensorflow', 'keras'))\n",
-    "     reticulate::use_virtualenv('", envname, "')\n",
-    "     or in shell terminal: pip install tensorflow keras\n",
-    call. = FALSE
-  )
+  check_lstm_environment()
+  message("setup_tensorflow: environment successfully verified and ready for LSTM models.")
+  invisible(py)
 }
 
 #' Get path to an example dataset (downloading on demand if needed)
