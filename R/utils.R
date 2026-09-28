@@ -296,6 +296,8 @@ setup_tensorflow <- function(envname = "microcl_env", install_if_missing = TRUE)
     Sys.setenv(KERAS_HOME = k_dir)
   }
 
+  py_packages <- c("tensorflow", "keras", "scipy", "pandas", "pydot", "ipython")
+
   py <- NULL
   if (nzchar(Sys.getenv("RETICULATE_PYTHON"))) {
     py <- Sys.getenv("RETICULATE_PYTHON")
@@ -315,7 +317,7 @@ setup_tensorflow <- function(envname = "microcl_env", install_if_missing = TRUE)
       } else if (isTRUE(install_if_missing)) {
         message("setup_tensorflow: installing tensorflow into virtual environment '", envname, "'...")
         tryCatch({
-          reticulate::virtualenv_install(envname, packages = c("tensorflow", "keras"))
+          reticulate::virtualenv_install(envname, packages = py_packages)
           py <- cand_py
           Sys.setenv(RETICULATE_PYTHON = py)
           message("setup_tensorflow: successfully configured virtualenv '", envname, "' (", py, ")")
@@ -379,7 +381,7 @@ setup_tensorflow <- function(envname = "microcl_env", install_if_missing = TRUE)
     # 4. If no existing environment with TensorFlow was found, install or stop with instructions
     if (isTRUE(install_if_missing)) {
       message("setup_tensorflow: creating virtual environment '", envname, "' with tensorflow and keras...")
-      reticulate::virtualenv_create(envname, packages = c("tensorflow", "keras"))
+      reticulate::virtualenv_create(envname, packages = py_packages)
       py <- reticulate::virtualenv_python(envname)
       Sys.setenv(RETICULATE_PYTHON = py)
       message("setup_tensorflow: successfully configured virtualenv '", envname, "' (", py, ")")
