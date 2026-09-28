@@ -3,14 +3,36 @@
 Scripts showing how to prepare raw input files for the `microclCorr` package.
 These correspond to the data preparation step shown in Figure 1 of the manuscript.
 
+## Prerequisites
+
+These preprocessing examples require the `microclCorr` package installed and loaded in R:
+
+```r
+library(microclCorr)
+```
+
+No Python, TensorFlow, or Keras environment is required for data preprocessing (only base R and `microclCorr` are used).
+
+## Run
+
+Run either script directly from an active R session:
+
+```r
+# Preprocess data from a single field logger:
+source(system.file("examples", "preprocessing_examples", "preprocessing_single_logger.R", package = "microclCorr"))
+
+# Preprocess and pool data from multiple field loggers:
+source(system.file("examples", "preprocessing_examples", "preprocessing_multiple_loggers.R", package = "microclCorr"))
+```
+
+Alternatively, open either script in RStudio and run it with **Source**. Paths are resolved automatically relative to the package installation or script location.
+
 ## Scripts
 
 | Script | Description |
 |--------|-------------|
 | `preprocessing_single_logger.R` | Prepares data from a single field logger |
 | `preprocessing_multiple_loggers.R` | Prepares and pools data from multiple loggers |
-
-Open a script in RStudio and run it with **Source**. Paths are resolved automatically relative to the script location.
 
 ## Input data (`data/`)
 
