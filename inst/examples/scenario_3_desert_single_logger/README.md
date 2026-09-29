@@ -24,7 +24,11 @@ setup_tensorflow()
 Once TensorFlow is configured, run the scenario:
 
 ```r
+# 1. Run the ML pipeline (trains models, evaluates correction, saves results)
 source(system.file("examples", "scenario_3_desert_single_logger", "run_scenario_3.R", package = "microclCorr"))
+
+# 2. (Optional) Generate diagnostic figures (requires ggplot2, gridExtra, ggpubr, cowplot)
+source(system.file("examples", "scenario_3_desert_single_logger", "plot_scenario_3.R", package = "microclCorr"))
 ```
 
 ## Input

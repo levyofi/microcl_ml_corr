@@ -11,7 +11,11 @@ loggers (~4,631 rows), not just one, so it already has ~3× more data than Scena
 ## Run
 
 ```r
+# 1. Run the ML pipeline (trains models, evaluates zero-shot transfer, saves results)
 source(system.file("examples", "scenario_8_zero_shot_transfer", "run_scenario_8.R", package = "microclCorr"))
+
+# 2. (Optional) Generate diagnostic figures (requires ggplot2, gridExtra, ggpubr, cowplot)
+source(system.file("examples", "scenario_8_zero_shot_transfer", "plot_scenario_8.R", package = "microclCorr"))
 ```
 
 ## Input

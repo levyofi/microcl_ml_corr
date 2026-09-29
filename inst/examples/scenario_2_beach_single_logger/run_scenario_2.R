@@ -37,13 +37,15 @@
 #   explicit user instruction. Before running this scenario for the first time,
 #   please configure and install the required environment by running:
 #       library(microclCorr)
-#       setup_tensorflow()
+# Note:
+#   This script trains the models, evaluates performance, and outputs CSV results.
+#   To generate diagnostic figures, run plot_scenario_2.R (requires ggplot2,
+#   gridExtra, ggpubr, and cowplot).
 # =============================================================================
 
 source(system.file("examples", "examples_utility_functions.R", package = "microclCorr"))
 check_lstm_environment()
 library(microclCorr)
-library(ggplot2)
 
 # ── Settings ──────────────────────────────────────────────────────────────────
 SEED     <- 123            # fixing the random seed makes results reproducible
@@ -173,15 +175,10 @@ full_df <- build_pred_df(rf_test, feature_cols, rf_model,
                           base_test_lstm, lstm_model, X_test_lstm)
 full_df <- full_df[order(full_df$time), ]
 
-# 120-hour excerpt
-ggsave(file.path(SCENARIO_DIR, "prediction_examples_beach.png"),
-       make_pred_plot(head(full_df, 120),
-                      "Coastal Beach (Ashkelon 15 m) — First 120 Hours of Test Set"),
-       width = 8, height = 4.5, dpi = 300)
 
-# Full test-set temporal plot
 # ── Daily min / mean / max statistics ─────────────────────────────────────────
 cat("\nDaily min / mean / max — RMSE, ME, SD (°C):\n")
 print_daily_stats(compute_daily_stats(full_df), paste0("Beach - ", SITE))
 
+cat("\nNote: To generate figures, run plot_scenario_2.R (requires ggplot2, gridExtra, ggpubr, cowplot).\n")
 cat("=== Scenario 2 complete ===\n")

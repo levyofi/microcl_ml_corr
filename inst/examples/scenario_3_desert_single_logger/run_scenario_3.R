@@ -37,14 +37,15 @@
 #   explicit user instruction. Before running this scenario for the first time,
 #   please configure and install the required environment by running:
 #       library(microclCorr)
-#       setup_tensorflow()
+# Note:
+#   This script trains the models, evaluates performance, and outputs CSV results.
+#   To generate diagnostic figures, run plot_scenario_3.R (requires ggplot2,
+#   gridExtra, ggpubr, and cowplot).
 # =============================================================================
 
 source(system.file("examples", "examples_utility_functions.R", package = "microclCorr"))
 check_lstm_environment()
 library(microclCorr)
-library(ggplot2)
-library(gridExtra)
 
 # ── Settings ──────────────────────────────────────────────────────────────────
 SEED     <- 123            # fixing the random seed makes results reproducible
@@ -65,8 +66,6 @@ tasks <- list(
 cat("=== Scenario 3: Desert Habitat ===\n")
 
 all_results      <- list()
-plot_list        <- list()
-temp_plot_list   <- list()
 stats_list       <- list()
 daily_stats_list <- list()
 
@@ -177,21 +176,7 @@ for (task in tasks) {
   # ── Daily min / mean / max RMSE, ME, and SD ──────────────────────────────────
   daily_stats_list[[task$name]] <- compute_daily_stats(full_df)
 
-  # ── Prediction plots ──────────────────────────────────────────────────────────
-  is_first <- task$name == tasks[[1]]$name
-
-  plot_list[[task$name]] <- make_pred_plot(
-    head(full_df, 120), task$title, show_legend = is_first)
-
-  temp_plot_list[[task$name]] <- make_pred_plot(
-    full_df, task$title, show_legend = is_first)
 }
-
-# ── Save prediction plot (120-hour excerpt) ───────────────────────────────────
-ggsave(file.path(SCENARIO_DIR, "prediction_examples_desert.png"),
-       grid.arrange(grobs = plot_list, ncol = 2), width = 12, height = 5, dpi = 300)
-
-# ── Save full test-set temporal plots ─────────────────────────────────────────
 # ── Save temperature statistics table ─────────────────────────────────────────
 stats_df <- do.call(rbind, stats_list)
 write.csv(stats_df, file.path(RESULTS_DIR, "logger_temp_stats.csv"), row.names = FALSE)
@@ -209,4 +194,5 @@ for (task in tasks) {
   print_daily_stats(daily_stats_list[[task$name]], task$title)
 }
 
+cat("\nNote: To generate figures, run plot_scenario_3.R (requires ggplot2, gridExtra, ggpubr, cowplot).\n")
 cat("=== Scenario 3 complete ===\n")
