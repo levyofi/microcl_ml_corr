@@ -103,8 +103,8 @@ The scenarios in this folder correspond directly to the **4 Examples** presented
 |----------|---------------|----------------|
 | **preprocessing_examples** | — | How do I prepare my own logger CSV before using this package? |
 | **1 — Valley** | **Example 1** | How well does local correction work? How much data do I need? |
-| **2 — Beach** | **Example 1** | Same as Scenario 1, but for a coastal site (harder to correct). |
-| **3 — Desert** | **Example 1** | Same as Scenario 1, but for a desert site (very easy to correct). |
+| **2 — Beach** | — | Same as Scenario 1, but for a coastal site (harder to correct). |
+| **3 — Desert** | — | Same as Scenario 1, but for a desert site (very easy to correct). |
 | **4 — Beach Pooled** | **Example 2** | Does pooling all loggers into one model improve things? |
 | **5 — Beach Specialized** | — | Does training one model per location beat the pooled model? |
 | **6 — Desert Pooled** | — | Same as Scenario 4, but for 48 desert loggers. |

@@ -113,7 +113,7 @@ remotes::install_local("microcl_ml_corr-3E14.zip")
 
 ### 2. Set up TensorFlow (required for LSTM models only)
 
-The LSTM model uses Python's TensorFlow library under the hood. To configure your environment for TensorFlow:
+If the user wants to train an LSTM model, the model uses Python's TensorFlow library under the hood. To configure your environment for TensorFlow:
 
 ```R
 library(microclCorr)
@@ -132,8 +132,8 @@ The package includes eight fully worked scenario scripts in [`inst/examples/`](i
 |----------|---------------|-----------------|
 | [Preprocessing](inst/examples/preprocessing_examples/) | — | How do I prepare my CSV files before running the pipeline? |
 | [1 — Valley](inst/examples/scenario_1_valley_single_logger/) | **Example 1** | How well does local correction work? How much logger data do I need? |
-| [2 — Beach](inst/examples/scenario_2_beach_single_logger/) | **Example 1** | Same as above for a coastal site, where NicheMapR errors are larger. |
-| [3 — Desert](inst/examples/scenario_3_desert_single_logger/) | **Example 1** | Same as above for a desert site, where even 1–2 days of data is enough. |
+| [2 — Beach](inst/examples/scenario_2_beach_single_logger/) | — | Same as above for a coastal site, where NicheMapR errors are larger. |
+| [3 — Desert](inst/examples/scenario_3_desert_single_logger/) | — | Same as above for a desert site, where even 1–2 days of data is enough. |
 | [4 — Beach Pooled](inst/examples/scenario_4_beach_pooled/) | **Example 2** | Does training on ALL loggers at once improve accuracy? |
 | [5 — Beach Specialized](inst/examples/scenario_5_beach_specialized/) | — | Does training one model per location beat a single pooled model? |
 | [6 — Desert Pooled](inst/examples/scenario_6_desert_pooled/) | — | Same as Scenario 4, but across 48 desert loggers. |
