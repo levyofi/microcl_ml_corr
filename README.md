@@ -34,65 +34,33 @@ Two model types are available and compared:
 
 ## Workflow
 
-Once the aligned CSV is prepared, the ML pipeline proceeds through the following stages:
+### 1. What you need to provide
 
-```mermaid
-flowchart TD
-    %% Data Preparation
-    subgraph Prep [Data preparation]
-        L[load_prepared_csv_data] --> C[add_cyclical_time]
-        C --> F[get_feature_columns]
-        F --> S[split_train_val_test]
-    end
+The pipeline begins with two standard data sources:
 
-    %% Random Forest Training
-    subgraph RF [Random Forest Training]
-        RF_T[train_rf]
-    end
+- **Logger data CSV** — field measurements containing timestamps, measured temperatures, microhabitat label, and environmental covariates (e.g. solar radiation, wind speed, relative humidity).
+- **Physical model predictions CSV** — mechanistic model predictions (e.g. NicheMapR) for the corresponding location and time period.
 
-    %% LSTM Training
-    subgraph LSTM [LSTM Training]
-        SCL[lstm_scaling] --> WIN[lstm_specific_preprocessing]
-        WIN --> LTT[train_lstm]
-    end
+### 2. Pre-processing: Creating the Aligned CSV
 
-    S --> RF_T
-    S --> SCL
+Before running `microclCorr`, combine both sources into a single **aligned CSV** (done outside the package):
 
-    %% Model Selection
-    subgraph Sel [Model selection]
-        RF_T --> ALGN[align_test_sets]
-        LTT --> ALGN
-        ALGN --> EVAL[evaluate_correction]
-        EVAL --> CMP[Compare models]
-        CMP --> SAV[save_correction_model]
-    end
+1. **Align by timestamp**: Match measured and predicted values for each time step.
+2. **Compute residuals**: Add a `residual` column (`measured − predicted`).
+3. *(If using multiple loggers)*: Add a microhabitat column if not already present, add a site identifier (e.g. `Site_ID = "Mishmar River"`), and stack all logger tables into one file.
 
-    %% Apply to New Data
-    subgraph Inf [Apply to New Data]
-        LDM[load_correction_model] --> PRD[correct_predictions]
-    end
-    
-    SAV -.-> LDM
-```
+Ready-to-run helper scripts for this step are provided in the [preprocessing examples](inst/examples/preprocessing_examples/).
 
-**Pipeline Stages:**
-1. **Data preparation**: Load the aligned CSV, encode cyclical time features, identify predictor columns, and partition the data into training, validation, and test subsets.
-2. **Training**: The data is passed to two parallel training branches:
-   - **Random Forest**: Fits a Random Forest model.
-   - **LSTM**: Normalizes inputs, reformats time series into overlapping windows, and fits the neural network.
-3. **Model selection**: Test sets are aligned and evaluated. The model with the best correction accuracy is selected and saved.
-4. **Apply to New Data**: The saved model bundle is loaded and applied to correct new physical model predictions.
+### 3. Machine Learning Correction Pipeline (`microclCorr`)
 
-**What you need to provide:**
-- A **logger data CSV** — measured temperatures, timestamps, microhabitat label, and environmental variables
-- A **physical model predictions CSV** — model-predicted temperatures for the same location and time period
+Once the aligned CSV is prepared, you can use `microclCorr` functions to run the correction pipeline through four main stages (see the [workflow figure](vignettes/workflow_combined.png)):
 
-**Your only pre-processing step** (done outside the package):
-1. Join both files by timestamp and add a `residual` column (measured − predicted)
-2. *(If using multiple loggers)* Add a microhabitat column if not already present, add a site ID column (e.g. `Site_ID` with values like `"Mishmar River"`), then stack all logger tables into one file
-
-See the [preprocessing examples](inst/examples/preprocessing_examples/) for ready-to-run scripts that demonstrate this step on real data.
+1. **Data preparation**: Ingest the aligned CSV (`load_prepared_csv_data`), generate cyclical diurnal time features (`add_cyclical_time`), identify predictor columns (`get_feature_columns`), and partition data into training, validation, and test subsets using block-temporal splitting (`split_train_val_test`).
+2. **Model training**: Train either model or both to predict the residual:
+   - **Random Forest**: Fits decision tree ensembles (`train_rf`). Fast, robust, and effective across sample sizes without requiring deep learning dependencies.
+   - **LSTM**: Scales inputs, constructs sliding time windows, and trains a recurrent neural network (`train_lstm`) to capture temporal inertia.
+3. **Evaluation and model selection**: Evaluate prediction accuracy against uncorrected baseline predictions (`evaluate_correction`). If both models were trained, align their test sets (`align_test_sets`) to compare performance and select the best one. Then, export the chosen model bundle (`save_correction_model`).
+4. **Apply to new data**: Load the saved model bundle (`load_correction_model`) and apply it to correct new physical model predictions across unmeasured periods or microhabitats (`correct_predictions`).
 
 ---
 
