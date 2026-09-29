@@ -64,9 +64,9 @@ Once the aligned CSV is prepared, you can use `microclCorr` functions to run the
 
 ---
 
-## Package Verification (`R CMD check`)
+## Package Verification (`R CMD check`) (For journal editors and reviewers)
 
-For reviewers performing package verification:
+For journal editors and reviewers performing package verification:
 
 ```bash
 # Install all required and suggested dependencies
@@ -80,7 +80,7 @@ R CMD check --no-manual microclCorr_0.1.0.tar.gz
 
 ---
 
-## Installation
+## Installation (for double-blind review)
 
 ### 1. Download and install locally
 
