@@ -35,7 +35,19 @@
 #   gridExtra, ggpubr, and cowplot).
 # =============================================================================
 
-source(system.file("examples", "examples_utility_functions.R", package = "microclCorr"))
+helpers_candidates <- c(
+  "examples_utility_functions.R",
+  file.path("..", "examples_utility_functions.R"),
+  file.path("inst", "examples", "examples_utility_functions.R"),
+  file.path("..", "inst", "examples", "examples_utility_functions.R"),
+  file.path("..", "..", "inst", "examples", "examples_utility_functions.R"),
+  system.file("examples", "examples_utility_functions.R", package = "microclCorr")
+)
+helpers_file <- helpers_candidates[nzchar(helpers_candidates) & file.exists(helpers_candidates)][1]
+if (is.na(helpers_file) || !file.exists(helpers_file)) {
+  stop("Could not locate examples_utility_functions.R. Please run from the repository or ensure package examples are available.", call. = FALSE)
+}
+source(helpers_file)
 library(microclCorr)
 
 # ── Settings ──────────────────────────────────────────────────────────────────

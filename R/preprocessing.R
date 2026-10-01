@@ -1,6 +1,133 @@
 # ---- microclCorr: Preprocessing ----
 # Port of preprocessing.py from the Python pipeline
 
+#' Prepare an in-memory dataset for ML training
+#'
+#' Takes an in-memory data.frame produced by data alignment and prepares it
+#' for ML training: parses/validates datetime, one-hot encodes categorical microhabitat,
+#' and optionally filters complete cases.
+#'
+#' @param df A data.frame.
+#' @param is_continuous_microhabitat Logical. TRUE if microhabitat is a continuous variable.
+#' @param datetime_format strptime format string for parsing the datetime column (used if datetime column is character or factor).
+#' @param microhabitat_col Name of the microhabitat column.
+#' @param datetime_col Name of the datetime column.
+#' @param microhabitat_levels Optional character vector specifying all expected microhabitat
+#'   levels. Useful when preparing train and test sets separately so that one-hot encoded
+#'   columns match even if some levels are absent from a split.
+#' @param complete_cases Logical. Whether to drop incomplete rows with a warning (default `TRUE`).
+#' @param source_label Character string describing the source data in error messages (default `"data.frame"`).
+#' @return A data.frame with parsed datetime and (optionally) one-hot encoded microhabitat.
+#' @seealso \code{\link{load_prepared_csv_data}} for loading and preparing directly from a CSV file.
+#' @examples
+#' data(microclimate_sample)
+#' prepared <- prepare_dataframe(microclimate_sample)
+#' head(prepared[, c("time", "microhabitat", "predicted", "residual")])
+#' @export
+prepare_dataframe <- function(df,
+                              is_continuous_microhabitat = FALSE,
+                              datetime_format = "%Y-%m-%d %H:%M:%S",
+                              microhabitat_col = "microhabitat",
+                              datetime_col = "time",
+                              microhabitat_levels = NULL,
+                              complete_cases = TRUE,
+                              source_label = "data.frame") {
+
+  if (!is.data.frame(df)) {
+    stop("df must be a data.frame, got: ", class(df)[1], call. = FALSE)
+  }
+  df <- as.data.frame(df)
+
+  # Validate datetime_col existence (Issue 12)
+  if (!(datetime_col %in% names(df))) {
+    trimmed_cand <- names(df)[trimws(names(df)) == trimws(datetime_col)]
+    case_cand <- names(df)[tolower(names(df)) == tolower(datetime_col)]
+    cand <- unique(c(trimmed_cand, case_cand))
+    hint <- if (length(cand) > 0) {
+      sprintf(" Did you mean '%s'?", cand[1])
+    } else {
+      ""
+    }
+    stop(sprintf(
+      "datetime_col '%s' not found in %s.%s Available columns: %s",
+      datetime_col, source_label, hint, paste(names(df), collapse = ", ")
+    ), call. = FALSE)
+  }
+
+  # One-hot encode categorical microhabitat (Issue 11)
+  if (!is_continuous_microhabitat && microhabitat_col %in% names(df)) {
+    orig_micro <- df[[microhabitat_col]]
+    df[[microhabitat_col]] <- NULL
+    if (!is.null(microhabitat_levels)) {
+      levels_micro <- unique(c(as.character(microhabitat_levels), as.character(unique(orig_micro))))
+    } else {
+      levels_micro <- sort(unique(orig_micro))
+    }
+    for (lvl in levels_micro) {
+      df[[paste0(microhabitat_col, "_", lvl)]] <- as.numeric(orig_micro == lvl)
+    }
+    df[[microhabitat_col]] <- orig_micro
+  }
+
+  # Datetime normalization & parsing
+  time_vals <- df[[datetime_col]]
+  if (inherits(time_vals, "POSIXt")) {
+    parsed_time <- as.POSIXct(time_vals, tz = "UTC")
+  } else if (inherits(time_vals, "Date")) {
+    parsed_time <- as.POSIXct(time_vals, tz = "UTC")
+  } else {
+    time_char <- as.character(time_vals)
+    no_colon <- !grepl(":", time_char, fixed = TRUE)
+    if (datetime_format == "%Y-%m-%d %H:%M:%S") {
+      time_char[no_colon] <- paste0(time_char[no_colon], " 0:00:00")
+    } else if (datetime_format == "%d/%m/%Y %H:%M") {
+      time_char[no_colon] <- paste0(time_char[no_colon], " 0:00")
+    }
+
+    parsed_time <- as.POSIXct(time_char, format = datetime_format, tz = "UTC")
+    if (length(time_char) > 0 && all(is.na(parsed_time))) {
+      stop(sprintf(
+        "Failed to parse datetime column '%s' using format '%s'. All values converted to NA. Example value from dataset: '%s'",
+        datetime_col, datetime_format, as.character(time_char[1])
+      ), call. = FALSE)
+    }
+
+    na_count <- sum(is.na(parsed_time))
+    if (na_count > 0) {
+      warning(sprintf(
+        "%d of %d timestamps in column '%s' could not be parsed with format '%s' and resulted in NA.",
+        na_count, length(time_char), datetime_col, datetime_format
+      ), call. = FALSE)
+    }
+  }
+
+  df[[datetime_col]] <- parsed_time
+
+  # Complete cases filtering (Issue 14)
+  if (complete_cases) {
+    n_rows_before <- nrow(df)
+    na_per_col <- colSums(is.na(df))
+    cols_with_na <- names(na_per_col)[na_per_col > 0]
+
+    df <- df[complete.cases(df), , drop = FALSE]
+    n_dropped <- n_rows_before - nrow(df)
+
+    if (n_rows_before > 0 && nrow(df) == 0) {
+      stop("All rows were dropped after parsing due to missing values (complete.cases). Check your datetime_format and input data.", call. = FALSE)
+    }
+
+    if (n_dropped > 0) {
+      col_breakdown <- paste(sprintf("%s (%d NAs)", cols_with_na, na_per_col[cols_with_na]), collapse = ", ")
+      warning(sprintf(
+        "%d of %d rows (%.1f%%) dropped due to missing values (sensor dropouts / NAs) across columns: %s.",
+        n_dropped, n_rows_before, 100 * n_dropped / n_rows_before, col_breakdown
+      ), call. = FALSE)
+    }
+  }
+
+  return(df)
+}
+
 #' Load a prepared CSV dataset
 #'
 #' Loads a CSV produced by the data alignment pipeline and prepares it
@@ -12,7 +139,13 @@
 #' @param includes_index Logical. TRUE if the CSV has a row-index column.
 #' @param microhabitat_col Name of the microhabitat column.
 #' @param datetime_col Name of the datetime column.
+#' @param microhabitat_levels Optional character vector specifying all expected microhabitat
+#'   levels. Useful when loading train and test CSVs separately so that one-hot encoded
+#'   columns match even if some levels are absent from a split.
+#' @param na.strings Character vector of strings to interpret as NA when reading the CSV
+#'   (default includes "NA", "N/A", "null", "NULL", "NaN", "").
 #' @return A data.frame with parsed datetime and (optionally) one-hot encoded microhabitat.
+#' @seealso \code{\link{prepare_dataframe}} for preparing an in-memory data.frame.
 #' @examples
 #' csv_path <- get_example_data("desert_data_preprocessed.csv")
 #' loaded <- load_prepared_csv_data(csv_path)
@@ -23,39 +156,28 @@ load_prepared_csv_data <- function(path,
                                    datetime_format = "%Y-%m-%d %H:%M:%S",
                                    includes_index = TRUE,
                                    microhabitat_col = "microhabitat",
-                                   datetime_col = "time") {
+                                   datetime_col = "time",
+                                   microhabitat_levels = NULL,
+                                   na.strings = c("NA", "N/A", "null", "NULL", "NaN", "")) {
 
   if (includes_index) {
-    df <- read.csv(path, row.names = 1, stringsAsFactors = FALSE)
+    df <- utils::read.csv(path, row.names = 1, stringsAsFactors = FALSE, na.strings = na.strings)
   } else {
-    df <- read.csv(path, stringsAsFactors = FALSE)
+    df <- utils::read.csv(path, stringsAsFactors = FALSE, na.strings = na.strings)
   }
 
-  # One-hot encode categorical microhabitat
-  if (!is_continuous_microhabitat && microhabitat_col %in% names(df)) {
-    orig_micro <- df[[microhabitat_col]]
-    df[[microhabitat_col]] <- NULL
-    levels_micro <- unique(orig_micro)
-    for (lvl in levels_micro) {
-      df[[paste0(microhabitat_col, "_", lvl)]] <- as.numeric(orig_micro == lvl)
-    }
-    df[[microhabitat_col]] <- orig_micro
-  }
-
-  # Fix midnight timestamps that lack time component
-  time_vals <- df[[datetime_col]]
-  no_colon <- !grepl(":", time_vals, fixed = TRUE)
-  if (datetime_format == "%Y-%m-%d %H:%M:%S") {
-    time_vals[no_colon] <- paste0(time_vals[no_colon], " 0:00:00")
-  } else if (datetime_format == "%d/%m/%Y %H:%M") {
-    time_vals[no_colon] <- paste0(time_vals[no_colon], " 0:00")
-  }
-
-  df[[datetime_col]] <- as.POSIXct(time_vals, format = datetime_format, tz = "UTC")
-  df <- df[complete.cases(df), , drop = FALSE]
-
-  return(df)
+  prepare_dataframe(
+    df = df,
+    is_continuous_microhabitat = is_continuous_microhabitat,
+    datetime_format = datetime_format,
+    microhabitat_col = microhabitat_col,
+    datetime_col = datetime_col,
+    microhabitat_levels = microhabitat_levels,
+    complete_cases = TRUE,
+    source_label = sprintf("CSV '%s'", path)
+  )
 }
+
 
 #' Get feature columns for model training
 #'
@@ -81,7 +203,34 @@ get_feature_columns <- function(df,
   cols_to_exclude <- unique(c(avoid_cols, target_col, microhabitat_col, prediction_col))
   candidates <- setdiff(names(df), cols_to_exclude)
   # Keep only numeric columns (excludes leftover character metadata columns)
-  candidates[sapply(df[candidates], is.numeric)]
+  numeric_cols <- candidates[sapply(df[candidates], is.numeric)]
+
+  # Check non-numeric candidate columns for numeric data coerced by stray strings (Issue 13)
+  non_numeric_candidates <- setdiff(candidates, numeric_cols)
+  for (col in non_numeric_candidates) {
+    vals <- df[[col]]
+    if (is.character(vals) || is.factor(vals)) {
+      num_vals <- suppressWarnings(as.numeric(as.character(vals)))
+      valid_num_count <- sum(!is.na(num_vals))
+      non_empty <- sum(!is.na(vals) & trimws(as.character(vals)) != "")
+      if (non_empty > 0 && (valid_num_count / non_empty) >= 0.5) {
+        bad_idx <- which(!is.na(vals) & is.na(num_vals) & trimws(as.character(vals)) != "")
+        bad_samples <- unique(as.character(vals[bad_idx]))
+        if (length(bad_samples) > 3) bad_samples <- c(bad_samples[1:3], "...")
+        warning(sprintf(
+          "Column '%s' was excluded from feature columns because it is %s, but appears to contain mostly numeric values (%.1f%%) with stray non-numeric strings (%s). Check for unparsed missing values (e.g. 'N/A') or typo strings.",
+          col, class(vals)[1], 100 * valid_num_count / non_empty,
+          paste(sprintf("'%s'", bad_samples), collapse = ", ")
+        ), call. = FALSE)
+      }
+    }
+  }
+
+  if (length(numeric_cols) == 0) {
+    warning("get_feature_columns: No numeric feature columns found in dataset after excluding target and metadata columns.", call. = FALSE)
+  }
+
+  numeric_cols
 }
 
 #' Add cyclical time features
@@ -98,6 +247,16 @@ get_feature_columns <- function(df,
 #' head(df[, c("time", "Hour_sin", "Hour_cos", "Month_sin", "Month_cos")])
 #' @export
 add_cyclical_time <- function(df, datetime_col = "time", add_month = FALSE) {
+  if (!(datetime_col %in% names(df))) {
+    trimmed_cand <- names(df)[trimws(names(df)) == trimws(datetime_col)]
+    case_cand <- names(df)[tolower(names(df)) == tolower(datetime_col)]
+    cand <- unique(c(trimmed_cand, case_cand))
+    hint <- if (length(cand) > 0) sprintf(" Did you mean '%s'?", cand[1]) else ""
+    stop(sprintf(
+      "datetime_col '%s' not found in data.frame.%s Available columns: %s",
+      datetime_col, hint, paste(names(df), collapse = ", ")
+    ), call. = FALSE)
+  }
   hours <- as.numeric(format(df[[datetime_col]], "%H"))
   df$Hour_sin <- sin(2 * pi * hours / 24)
   df$Hour_cos <- cos(2 * pi * hours / 24)
@@ -142,6 +301,17 @@ split_train_val_test <- function(data,
                                  train_blocks = NULL,
                                  val_blocks = NULL,
                                  test_blocks = NULL) {
+
+  if (!(datetime_col %in% names(data))) {
+    trimmed_cand <- names(data)[trimws(names(data)) == trimws(datetime_col)]
+    case_cand <- names(data)[tolower(names(data)) == tolower(datetime_col)]
+    cand <- unique(c(trimmed_cand, case_cand))
+    hint <- if (length(cand) > 0) sprintf(" Did you mean '%s'?", cand[1]) else ""
+    stop(sprintf(
+      "datetime_col '%s' not found in data.%s Available columns: %s",
+      datetime_col, hint, paste(names(data), collapse = ", ")
+    ), call. = FALSE)
+  }
 
   df <- data[order(data[[datetime_col]]), , drop = FALSE]
 
@@ -194,12 +364,16 @@ split_train_val_test <- function(data,
 
   } else {
     n <- nrow(df)
-    end_train <- floor(n * train_pct)
-    end_val   <- floor(n * (val_pct + train_pct))
+    end_train <- min(n, max(0L, floor(n * train_pct)))
+    end_val   <- min(n, max(end_train, floor(n * (val_pct + train_pct))))
 
-    train_df <- df[seq_len(end_train), , drop = FALSE]
-    val_df   <- df[(end_train + 1):end_val, , drop = FALSE]
-    test_df  <- df[(end_val + 1):n, , drop = FALSE]
+    idx_train <- if (end_train >= 1L) seq_len(end_train) else integer(0)
+    idx_val   <- if (end_val > end_train) seq.int(end_train + 1L, end_val) else integer(0)
+    idx_test  <- if (n > end_val) seq.int(end_val + 1L, n) else integer(0)
+
+    train_df <- df[idx_train, , drop = FALSE]
+    val_df   <- df[idx_val, , drop = FALSE]
+    test_df  <- df[idx_test, , drop = FALSE]
   }
 
   list(train = train_df, val = val_df, test = test_df)
@@ -241,6 +415,27 @@ stratified_split_train_val_test <- function(data,
                                             datetime_col = "time",
                                             seed = 123) {
 
+  if (!(datetime_col %in% names(data))) {
+    trimmed_cand <- names(data)[trimws(names(data)) == trimws(datetime_col)]
+    case_cand <- names(data)[tolower(names(data)) == tolower(datetime_col)]
+    cand <- unique(c(trimmed_cand, case_cand))
+    hint <- if (length(cand) > 0) sprintf(" Did you mean '%s'?", cand[1]) else ""
+    stop(sprintf(
+      "datetime_col '%s' not found in data.%s Available columns: %s",
+      datetime_col, hint, paste(names(data), collapse = ", ")
+    ), call. = FALSE)
+  }
+  if (!(stratify_col %in% names(data))) {
+    trimmed_cand <- names(data)[trimws(names(data)) == trimws(stratify_col)]
+    case_cand <- names(data)[tolower(names(data)) == tolower(stratify_col)]
+    cand <- unique(c(trimmed_cand, case_cand))
+    hint <- if (length(cand) > 0) sprintf(" Did you mean '%s'?", cand[1]) else ""
+    stop(sprintf(
+      "stratify_col '%s' not found in data.%s Available columns: %s",
+      stratify_col, hint, paste(names(data), collapse = ", ")
+    ), call. = FALSE)
+  }
+
   df <- data[order(data[[datetime_col]]), , drop = FALSE]
 
   set.seed(seed)
@@ -260,6 +455,13 @@ stratified_split_train_val_test <- function(data,
 
     blocks_shuffled <- sample(unique(block))
     n_b     <- length(blocks_shuffled)
+    if (n_b < 3) {
+      warning(sprintf(
+        "Stratification group '%s' has only %d block(s) of %d days. Groups with fewer than 3 blocks cannot be partitioned across train/val/test; %s rows are assigned to test.",
+        as.character(strat_val), n_b, block_days,
+        if (floor(n_b * train_pct) == 0 && floor(n_b * val_pct) == 0) "all" else "some"
+      ), call. = FALSE)
+    }
     n_train <- floor(n_b * train_pct)
     n_val   <- floor(n_b * val_pct)
     n_test  <- n_b - n_train - n_val
@@ -326,6 +528,31 @@ lstm_scaling <- function(train, val, test,
 
   scaler <- list(min = mins, range = ranges, cols = cols_to_scale)
 
+  # Reconcile any missing microhabitat columns in val or test (Issue 11)
+  for (nm in c("val", "test")) {
+    d <- get(nm)
+    missing_cols <- setdiff(cols_to_scale, names(d))
+    if (length(missing_cols) > 0) {
+      is_micro <- grepl(paste0("^", microhabitat_col, "_"), missing_cols)
+      if (any(is_micro)) {
+        for (mc in missing_cols[is_micro]) {
+          lvl <- sub(paste0("^", microhabitat_col, "_"), "", mc)
+          if (microhabitat_col %in% names(d)) {
+            d[[mc]] <- as.numeric(as.character(d[[microhabitat_col]]) == lvl)
+          } else {
+            d[[mc]] <- 0
+          }
+        }
+      }
+      missing_remaining <- setdiff(cols_to_scale, names(d))
+      if (length(missing_remaining) > 0) {
+        stop(sprintf("Feature column(s) '%s' present in training data were not found in %s dataset.",
+                     paste(missing_remaining, collapse = ", "), nm), call. = FALSE)
+      }
+      assign(nm, d)
+    }
+  }
+
   # Scale all three datasets
   for (col in cols_to_scale) {
     train[[col]] <- (train[[col]] - scaler$min[col]) / scaler$range[col]
@@ -364,6 +591,11 @@ lstm_scaling <- function(train, val, test,
 #' @export
 make_windows <- function(X_mat, y_vec, base_pred_vec, datetime_vec,
                          window_size, max_gap_hours = 1) {
+
+  if (!is.numeric(window_size) || length(window_size) != 1L || is.na(window_size) || window_size <= 0) {
+    stop("window_size must be a positive integer, got: ", window_size, call. = FALSE)
+  }
+  window_size <- as.integer(window_size)
 
   n <- nrow(X_mat)
   if (n < window_size) {
@@ -451,7 +683,8 @@ one_dataset_lstm_preprocessing <- function(data_set, window_size, unique_ts_site
   y_list <- list()
   bp_list <- list()
   dt_list <- list()
-  idx_per_ts <- list()
+  idx_per_ts <- setNames(vector("list", length(unique_ts_sites)), unique_ts_sites)
+  for (s in unique_ts_sites) idx_per_ts[[s]] <- integer(0)
   pos <- 0L
 
   feature_cols <- get_feature_columns(data_set, avoid_cols = avoid_cols,
@@ -461,7 +694,10 @@ one_dataset_lstm_preprocessing <- function(data_set, window_size, unique_ts_site
 
   for (ts_site in unique_ts_sites) {
     ts_df <- data_set[data_set[[ts_names_col]] == ts_site, , drop = FALSE]
-    if (nrow(ts_df) == 0) next
+    if (nrow(ts_df) == 0) {
+      idx_per_ts[[ts_site]] <- integer(0)
+      next
+    }
 
     X_mat <- as.matrix(ts_df[, feature_cols, drop = FALSE])
     y_vec <- ts_df[[target_col]]
@@ -470,10 +706,13 @@ one_dataset_lstm_preprocessing <- function(data_set, window_size, unique_ts_site
 
     win <- make_windows(X_mat, y_vec, pred_vec, dt_vec, window_size)
 
-    if (length(win$y) == 0) next
+    if (length(win$y) == 0) {
+      idx_per_ts[[ts_site]] <- integer(0)
+      next
+    }
 
     n_win <- length(win$y)
-    idx_per_ts[[length(idx_per_ts) + 1]] <- seq(pos, pos + n_win - 1L)
+    idx_per_ts[[ts_site]] <- seq(pos, pos + n_win - 1L)
     pos <- pos + n_win
 
     X_list[[length(X_list) + 1]] <- win$X
@@ -490,7 +729,7 @@ one_dataset_lstm_preprocessing <- function(data_set, window_size, unique_ts_site
         y = numeric(0), base_pred = numeric(0),
         datetime = as.POSIXct(character(0))
       ),
-      idx_per_ts = list()
+      idx_per_ts = idx_per_ts
     ))
   }
 
@@ -540,7 +779,17 @@ one_dataset_lstm_preprocessing <- function(data_set, window_size, unique_ts_site
 lstm_specific_preprocessing <- function(train, val, test, window_size,
                                         ts_names_col = "time_series_doc") {
 
-  unique_sites <- unique(train[[ts_names_col]])
+  for (nm in c("train", "val", "test")) {
+    d <- get(nm)
+    if (!(ts_names_col %in% names(d))) {
+      trimmed_cand <- names(d)[trimws(names(d)) == trimws(ts_names_col)]
+      hint <- if (length(trimmed_cand) > 0) sprintf(" Did you mean '%s'?", trimmed_cand[1]) else ""
+      stop(sprintf("ts_names_col '%s' not found in %s dataset.%s Available columns: %s",
+                   ts_names_col, nm, hint, paste(names(d), collapse = ", ")), call. = FALSE)
+    }
+  }
+
+  unique_sites <- unique(c(train[[ts_names_col]], val[[ts_names_col]], test[[ts_names_col]]))
 
   train_res <- one_dataset_lstm_preprocessing(train, window_size, unique_sites, ts_names_col)
   val_res   <- one_dataset_lstm_preprocessing(val, window_size, unique_sites, ts_names_col)
@@ -584,11 +833,30 @@ lstm_specific_preprocessing <- function(train, val, test, window_size,
 align_test_sets <- function(test_dataset, lstm_test_dict, ts_index_info,
                             site_name_col, datetime_col = "time") {
 
+  if (!(site_name_col %in% names(test_dataset))) {
+    trimmed_cand <- names(test_dataset)[trimws(names(test_dataset)) == trimws(site_name_col)]
+    hint <- if (length(trimmed_cand) > 0) sprintf(" Did you mean '%s'?", trimmed_cand[1]) else ""
+    stop(sprintf("site_name_col '%s' not found in test_dataset.%s Available columns: %s",
+                 site_name_col, hint, paste(names(test_dataset), collapse = ", ") ), call. = FALSE)
+  }
+  if (!(datetime_col %in% names(test_dataset))) {
+    trimmed_cand <- names(test_dataset)[trimws(names(test_dataset)) == trimws(datetime_col)]
+    hint <- if (length(trimmed_cand) > 0) sprintf(" Did you mean '%s'?", trimmed_cand[1]) else ""
+    stop(sprintf("datetime_col '%s' not found in test_dataset.%s Available columns: %s",
+                 datetime_col, hint, paste(names(test_dataset), collapse = ", ")), call. = FALSE)
+  }
+
   # Reconstruct site names for each LSTM window
   test_sites <- character(length(lstm_test_dict$datetime))
   for (i in seq_along(ts_index_info$datasets)) {
     site_name <- ts_index_info$datasets[i]
-    test_idx  <- ts_index_info$test_indices[[i]]
+    test_idx <- if (!is.null(names(ts_index_info$test_indices))) {
+      ts_index_info$test_indices[[site_name]]
+    } else if (i <= length(ts_index_info$test_indices)) {
+      ts_index_info$test_indices[[i]]
+    } else {
+      integer(0)
+    }
     if (length(test_idx) > 0) {
       test_sites[test_idx + 1L] <- site_name  # +1 for R 1-indexing
     }
@@ -598,11 +866,24 @@ align_test_sets <- function(test_dataset, lstm_test_dict, ts_index_info,
   lstm_keys <- data.frame(
     dt   = lstm_test_dict$datetime,
     site = test_sites,
+    .order = seq_along(lstm_test_dict$datetime),
     stringsAsFactors = FALSE
   )
-  names(lstm_keys) <- c(datetime_col, site_name_col)
+  names(lstm_keys)[1:2] <- c(datetime_col, site_name_col)
 
-  # Merge (inner join preserving LSTM order)
-  aligned <- merge(lstm_keys, test_dataset, by = c(datetime_col, site_name_col))
+  # Check and handle duplicates in test_dataset to prevent many-to-many fan-out
+  dup_mask <- duplicated(test_dataset[c(datetime_col, site_name_col)])
+  if (any(dup_mask)) {
+    warning(sprintf(
+      "Found %d duplicate (%s, %s) timestamp(s) in test_dataset; deduplicating to avoid merge fan-out.",
+      sum(dup_mask), datetime_col, site_name_col
+    ), call. = FALSE)
+    test_dataset <- test_dataset[!dup_mask, , drop = FALSE]
+  }
+
+  # Merge (inner join preserving exact LSTM order)
+  aligned <- merge(lstm_keys, test_dataset, by = c(datetime_col, site_name_col), sort = FALSE)
+  aligned <- aligned[order(aligned$.order), , drop = FALSE]
+  aligned$.order <- NULL
   aligned
 }

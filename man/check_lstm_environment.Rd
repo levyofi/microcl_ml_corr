@@ -4,20 +4,29 @@
 \alias{check_lstm_environment}
 \title{Check if LSTM environment and required packages are configured}
 \usage{
-check_lstm_environment()
+check_lstm_environment(error = TRUE)
+}
+\arguments{
+\item{error}{Logical. If \code{TRUE} (default), raises an error explaining how
+to configure the environment. If \code{FALSE}, returns \code{FALSE} silently.}
 }
 \value{
-Invisible TRUE if the environment is ready.
+Invisible TRUE if the environment is ready; FALSE if not ready and \code{error = FALSE}.
 }
 \description{
 Checks whether the required R packages (\code{reticulate}, \code{tensorflow},
 and \code{keras3}) and a Python environment with TensorFlow and Keras are
-installed and available. If any component is missing, it stops execution
-with an informative message instructing the user to run \code{\link{setup_tensorflow}}.
-Does NOT automatically install packages.
+installed and available. If any component is missing, it either stops execution
+with an informative message (default) or returns \code{FALSE}.
 }
 \examples{
 \dontrun{
+  # As an assertion (stops if not ready):
   check_lstm_environment()
+
+  # As a conditional check:
+  if (check_lstm_environment(error = FALSE)) {
+    message("LSTM environment is ready!")
+  }
 }
 }

@@ -15,3 +15,5 @@ vignettes/*.html
 keras.json
 *.rds
 *.keras
+QA_TEST_PLAN.md
+QA_TEST_REPORT.md

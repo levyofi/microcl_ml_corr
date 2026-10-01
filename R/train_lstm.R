@@ -111,8 +111,18 @@ train_lstm <- function(train_X, train_y,
   check_keras3()
   check_tensorflow()
 
-  # Set seeds for reproducibility
-  tensorflow::tf$random$set_seed(as.integer(seed))
+  # Set seeds for reproducibility across R, Python, NumPy, and TensorFlow
+  if (requireNamespace("keras3", quietly = TRUE) && exists("set_random_seed", asNamespace("keras3"))) {
+    keras3::set_random_seed(as.integer(seed))
+  } else {
+    tensorflow::tf$random$set_seed(as.integer(seed))
+  }
+  tryCatch({
+    py_rnd <- reticulate::import("random", delay_load = FALSE)
+    py_rnd$seed(as.integer(seed))
+    py_np <- reticulate::import("numpy.random", delay_load = FALSE)
+    py_np$seed(as.integer(seed))
+  }, error = function(e) NULL)
   set.seed(seed)
 
   input_shape <- c(dim(train_X)[2], dim(train_X)[3])

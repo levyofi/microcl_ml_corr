@@ -28,6 +28,7 @@
 #'   tune      = FALSE
 #' )
 #' rf$r.squared
+#' @import ranger
 #' @export
 train_rf <- function(train_X, train_y,
                      num_trees = 500,
@@ -40,6 +41,9 @@ train_rf <- function(train_X, train_y,
                      seed = 123) {
 
   train_X <- as.data.frame(train_X)
+  if (ncol(train_X) == 0) {
+    stop("train_X contains 0 feature columns. Ensure feature columns are numeric and not all excluded.", call. = FALSE)
+  }
 
   if (is.null(mtry_options)) {
     p <- ncol(train_X)

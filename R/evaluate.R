@@ -34,6 +34,9 @@ evaluate_correction <- function(model, X, y, base_prediction,
 
   # Predict residuals
   if (model_type == "rf") {
+    if (!isNamespaceLoaded("ranger")) {
+      loadNamespace("ranger")
+    }
     pred_res <- stats::predict(model, data = as.data.frame(X))$predictions
   } else {
     check_keras3()
@@ -50,8 +53,14 @@ evaluate_correction <- function(model, X, y, base_prediction,
 
   # R^2
   ss_tot <- sum((measured - mean(measured))^2)
-  r2_base <- 1 - sum((measured - base_prediction)^2) / ss_tot
-  r2_corr <- 1 - sum((measured - corrected)^2) / ss_tot
+  if (isTRUE(all.equal(ss_tot, 0)) || ss_tot == 0) {
+    warning("Zero variance in measured values: R^2 is undefined, returning NA.", call. = FALSE)
+    r2_base <- NA_real_
+    r2_corr <- NA_real_
+  } else {
+    r2_base <- 1 - sum((measured - base_prediction)^2) / ss_tot
+    r2_corr <- 1 - sum((measured - corrected)^2) / ss_tot
+  }
 
   list(
     rmse_base = rmse_base,

@@ -26,17 +26,24 @@
 #'
 #' Checks whether the required R packages (\code{reticulate}, \code{tensorflow},
 #' and \code{keras3}) and a Python environment with TensorFlow and Keras are
-#' installed and available. If any component is missing, it stops execution
-#' with an informative message instructing the user to run \code{\link{setup_tensorflow}}.
-#' Does NOT automatically install packages.
+#' installed and available. If any component is missing, it either stops execution
+#' with an informative message (default) or returns \code{FALSE}.
 #'
-#' @return Invisible TRUE if the environment is ready.
+#' @param error Logical. If \code{TRUE} (default), raises an error explaining how
+#'   to configure the environment. If \code{FALSE}, returns \code{FALSE} silently.
+#' @return Invisible TRUE if the environment is ready; FALSE if not ready and \code{error = FALSE}.
 #' @examples
 #' \dontrun{
+#'   # As an assertion (stops if not ready):
 #'   check_lstm_environment()
+#'
+#'   # As a conditional check:
+#'   if (check_lstm_environment(error = FALSE)) {
+#'     message("LSTM environment is ready!")
+#'   }
 #' }
 #' @export
-check_lstm_environment <- function() {
+check_lstm_environment <- function(error = TRUE) {
   # Explicitly ensure auto-configuration and auto-downloading are disabled
   Sys.setenv(RETICULATE_AUTOCONFIGURE = "FALSE")
   Sys.setenv(RETICULATE_USE_MANAGED_VENV = "no")
@@ -49,24 +56,32 @@ check_lstm_environment <- function() {
   if (requireNamespace("reticulate", quietly = TRUE)) {
     retic_ver <- tryCatch(utils::packageVersion("reticulate"), error = function(e) NULL)
     if (!is.null(retic_ver) && retic_ver < "1.42.0") {
-      stop(
-        "Package 'reticulate' version ", as.character(retic_ver),
-        " is installed/loaded, but version >= 1.42.0 is required by 'tensorflow' and 'keras3'.\n",
-        "Please run:\n",
-        "  install.packages('reticulate')\n",
-        "and RESTART your R session before proceeding.",
-        call. = FALSE
-      )
+      if (error) {
+        stop(
+          "Package 'reticulate' version ", as.character(retic_ver),
+          " is installed/loaded, but version >= 1.42.0 is required by 'tensorflow' and 'keras3'.\n",
+          "Please run:\n",
+          "  install.packages('reticulate')\n",
+          "and RESTART your R session before proceeding.",
+          call. = FALSE
+        )
+      } else {
+        return(FALSE)
+      }
     }
   }
 
   if (length(missing_pkgs) > 0) {
-    stop(
-      "Running LSTM models requires the following R packages: ",
-      paste(missing_pkgs, collapse = ", "), ".\n",
-      "Please run setup_tensorflow() first to install and configure your environment.",
-      call. = FALSE
-    )
+    if (error) {
+      stop(
+        "Running LSTM models requires the following R packages: ",
+        paste(missing_pkgs, collapse = ", "), ".\n",
+        "Please run setup_tensorflow() first to install and configure your environment.",
+        call. = FALSE
+      )
+    } else {
+      return(FALSE)
+    }
   }
 
   # If RETICULATE_PYTHON is not set, check if microcl_env exists
@@ -78,16 +93,22 @@ check_lstm_environment <- function() {
   }
 
   has_backend <- tryCatch({
-    if (!reticulate::py_available(initialize = TRUE)) return(FALSE)
-    reticulate::py_module_available("keras") || reticulate::py_module_available("tensorflow")
+    suppressWarnings({
+      if (!reticulate::py_available(initialize = TRUE)) return(FALSE)
+      reticulate::py_module_available("keras") || reticulate::py_module_available("tensorflow")
+    })
   }, error = function(e) FALSE)
 
   if (!has_backend) {
-    stop(
-      "A Python environment with 'tensorflow' and 'keras' is required to run LSTM models.\n",
-      "Please run setup_tensorflow() first to configure and install your TensorFlow environment.",
-      call. = FALSE
-    )
+    if (error) {
+      stop(
+        "A Python environment with 'tensorflow' and 'keras' is required to run LSTM models.\n",
+        "Please run setup_tensorflow() first to configure and install your TensorFlow environment.",
+        call. = FALSE
+      )
+    } else {
+      return(FALSE)
+    }
   }
 
   invisible(TRUE)
@@ -175,21 +196,27 @@ load_correction_model <- function(path) {
   if (identical(obj$model_type, "lstm") || (!is.null(obj$keras_bytes)) ||
       (is.character(obj$model) && length(obj$model) > 0)) {
     check_keras3()
-    keras_path <- sub("\\.rds$", ".keras", path)
-    if (file.exists(keras_path)) {
-      obj$model <- keras3::load_model(keras_path)
-    } else if (!is.null(obj$keras_bytes)) {
+    if (!is.null(obj$keras_bytes)) {
       keras_tmp <- tempfile(fileext = ".keras")
       writeBin(obj$keras_bytes, keras_tmp)
       obj$model <- keras3::load_model(keras_tmp)
       unlink(keras_tmp)
     } else {
-      # Fallback for models saved with serialize_keras_object
-      tryCatch({
-        obj$model <- keras3::deserialize_keras_object(obj$model)
-      }, error = function(e) {
-        stop("Failed to load LSTM model. Dead python pointer and no side-by-side .keras file or embedded model bytes found.", call. = FALSE)
-      })
+      keras_path <- sub("\\.rds$", ".keras", path)
+      if (file.exists(keras_path)) {
+        obj$model <- keras3::load_model(keras_path)
+      } else {
+        # Fallback for models saved with serialize_keras_object
+        tryCatch({
+          obj$model <- keras3::deserialize_keras_object(obj$model)
+        }, error = function(e) {
+          stop("Failed to load LSTM model. Dead python pointer and no side-by-side .keras file or embedded model bytes found.", call. = FALSE)
+        })
+      }
+    }
+  } else if (identical(obj$model_type, "rf") || inherits(obj$model, "ranger")) {
+    if (!isNamespaceLoaded("ranger")) {
+      loadNamespace("ranger")
     }
   }
   obj
@@ -313,6 +340,23 @@ setup_tensorflow <- function(envname = "microcl_env", install_if_missing = TRUE)
       if (has_tf) {
         py <- cand_py
         Sys.setenv(RETICULATE_PYTHON = py)
+        if (isTRUE(install_if_missing)) {
+          missing_py <- c()
+          for (pkg in py_packages) {
+            pkg_check <- suppressWarnings(
+              system2(cand_py, args = c("-c", sprintf("\"import %s\"", pkg)),
+                      stdout = FALSE, stderr = FALSE))
+            if (!identical(pkg_check, 0L)) {
+              missing_py <- c(missing_py, pkg)
+            }
+          }
+          if (length(missing_py) > 0) {
+            message("setup_tensorflow: installing missing optional Python packages into '", envname, "' (", paste(missing_py, collapse = ", "), ")...")
+            tryCatch({
+              reticulate::virtualenv_install(envname, packages = missing_py)
+            }, error = function(e) NULL)
+          }
+        }
         message("setup_tensorflow: using virtualenv '", envname, "' (", py, ")")
       } else if (isTRUE(install_if_missing)) {
         message("setup_tensorflow: installing tensorflow into virtual environment '", envname, "'...")
@@ -441,7 +485,11 @@ get_example_data <- function(filename,
   candidates <- c(
     file.path("inst", "extdata", filename),
     file.path("..", "extdata", filename),
+    file.path("..", "inst", "extdata", filename),
+    file.path("..", "..", "inst", "extdata", filename),
     file.path("..", "..", "extdata", filename),
+    file.path("..", "..", "..", "inst", "extdata", filename),
+    file.path("..", "..", "..", "extdata", filename),
     file.path("extdata", filename)
   )
   for (cand in candidates) {
@@ -473,21 +521,25 @@ get_example_data <- function(filename,
 
   message("Downloading example dataset '", filename, "' from repository...")
 
+  tmp_dest <- tempfile(pattern = "microcl_dl_")
   err <- tryCatch({
     utils::download.file(
       url      = download_url,
-      destfile = target_file,
+      destfile = tmp_dest,
       mode     = "wb",
       quiet    = FALSE
     )
     NULL
   }, error = function(e) e)
 
-  if (!is.null(err) || !file.exists(target_file) || file.size(target_file) == 0) {
-    if (file.exists(target_file)) unlink(target_file)
+  if (!is.null(err) || !file.exists(tmp_dest) || file.size(tmp_dest) == 0) {
+    if (file.exists(tmp_dest)) unlink(tmp_dest)
     stop("Failed to download '", filename, "' from: ", download_url,
          if (!is.null(err)) paste0("\nError: ", err$message) else "")
   }
+
+  file.copy(tmp_dest, target_file, overwrite = TRUE)
+  unlink(tmp_dest)
 
   message("Dataset cached at: ", normalizePath(target_file))
   normalizePath(target_file)

@@ -23,18 +23,26 @@ df <- microclimate_sample
 
 ## Environment Setup
 
-### `check_lstm_environment()`
+### `check_lstm_environment(error = TRUE)`
 
-Verifies that the required R packages (`reticulate`, `tensorflow`, `keras3`) and a Python environment with TensorFlow and Keras are installed and available. If any component is missing, it halts execution and instructs the user to run `setup_tensorflow()`. Does not automatically install packages.
+Verifies that the required R packages (`reticulate`, `tensorflow`, `keras3`) and a Python environment with TensorFlow and Keras are installed and available. If any component is missing, it either halts execution and instructs the user to run `setup_tensorflow()` (when `error = TRUE`), or returns `FALSE` silently (when `error = FALSE`). Does not automatically install packages.
 
-**Parameters** None.
+**Parameters**
 
-**Returns** Invisible `TRUE` if the environment is ready.
+- `error`: Logical. If `TRUE` (default), raises an informative error if the environment is not ready. If `FALSE`, returns `FALSE` without error.
+
+**Returns** Invisible `TRUE` if the environment is ready; `FALSE` if not ready and `error = FALSE`.
 
 **Example**
 
 ```r
+# As an assertion:
 check_lstm_environment()
+
+# As a conditional check:
+if (check_lstm_environment(error = FALSE)) {
+  message("LSTM environment is ready!")
+}
 ```
 
 ### `setup_tensorflow()`
@@ -86,9 +94,37 @@ file.exists(csv_path)  # TRUE
 
 ---
 
+### `prepare_dataframe()`
+
+Prepares an in-memory data.frame for ML training: parses/validates the datetime column (supporting pre-parsed POSIXct or strings), one-hot encodes categorical microhabitat, and filters complete cases. This is the in-memory equivalent of `load_prepared_csv_data()`.
+
+**Parameters**
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `df` | data.frame | — | Input data.frame |
+| `is_continuous_microhabitat` | logical | `FALSE` | Skip one-hot encoding if microhabitat is numeric |
+| `datetime_format` | character | `"%Y-%m-%d %H:%M:%S"` | `strptime` format for string datetimes |
+| `microhabitat_col` | character | `"microhabitat"` | Name of the microhabitat column |
+| `datetime_col` | character | `"time"` | Name of the datetime column |
+| `microhabitat_levels` | character vector | `NULL` | Optional expected microhabitat levels to guarantee matching dummy columns |
+| `complete_cases` | logical | `TRUE` | Whether to drop incomplete rows with a warning |
+
+**Returns** `data.frame` with parsed POSIXct datetime and one-hot microhabitat columns appended.
+
+**Example**
+
+```r
+data(microclimate_sample)
+prepared <- prepare_dataframe(microclimate_sample)
+head(prepared[, c("time", "microhabitat", "predicted", "residual")])
+```
+
+---
+
 ### `load_prepared_csv_data()`
 
-Reads a pre-aligned CSV, parses the datetime column, and one-hot encodes a categorical microhabitat column.
+Reads a pre-aligned CSV, parses the datetime column, and one-hot encodes a categorical microhabitat column. Delegates preprocessing directly to `prepare_dataframe()`.
 
 **Parameters**
 
@@ -100,6 +136,8 @@ Reads a pre-aligned CSV, parses the datetime column, and one-hot encodes a categ
 | `includes_index` | logical | `TRUE` | Whether the CSV has a leading row-index column (written by `write.csv`) |
 | `microhabitat_col` | character | `"microhabitat"` | Name of the microhabitat column |
 | `datetime_col` | character | `"time"` | Name of the datetime column |
+| `microhabitat_levels` | character vector | `NULL` | Optional expected microhabitat levels |
+| `na.strings` | character vector | `c("NA", "N/A", ...)` | Strings to treat as NA when reading CSV |
 
 **Returns** `data.frame` with parsed POSIXct datetime and one-hot microhabitat columns appended (original column kept as `microhabitat`).
 

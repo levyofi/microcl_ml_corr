@@ -10,7 +10,9 @@ load_prepared_csv_data(
   datetime_format = "\%Y-\%m-\%d \%H:\%M:\%S",
   includes_index = TRUE,
   microhabitat_col = "microhabitat",
-  datetime_col = "time"
+  datetime_col = "time",
+  microhabitat_levels = NULL,
+  na.strings = c("NA", "N/A", "null", "NULL", "NaN", "")
 )
 }
 \arguments{
@@ -25,6 +27,10 @@ load_prepared_csv_data(
 \item{microhabitat_col}{Name of the microhabitat column.}
 
 \item{datetime_col}{Name of the datetime column.}
+
+\item{microhabitat_levels}{Optional character vector specifying all expected microhabitat levels.}
+
+\item{na.strings}{Character vector of strings to interpret as NA when reading the CSV.}
 }
 \value{
 A data.frame with parsed datetime and (optionally) one-hot encoded microhabitat.
@@ -37,4 +43,7 @@ for ML training: parses datetime, one-hot encodes categorical microhabitat.
 csv_path <- get_example_data("desert_data_preprocessed.csv")
 loaded <- load_prepared_csv_data(csv_path)
 head(loaded[, c("time", "microhabitat", "predicted", "residual")])
+}
+\seealso{
+\code{\link{prepare_dataframe}}
 }

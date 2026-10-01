@@ -10,12 +10,15 @@
 ^.*\.DS_Store$
 ^run_workflow\.R$
 ^run_example\.R$
-^inst/examples$
-^inst/extdata$
 ^.*\.tar\.gz$
+^inst/extdata$
+^inst/examples/.*/results$
+^inst/examples/.*/results/.*$
+^inst/examples/results$
+^inst/examples/results/.*$
+^inst/examples/.*\.png$
 ^\.claude$
-^.*\.claude.*$
 ^.*\.rds$
-
-
+^QA_TEST_PLAN\.md$
+^QA_TEST_REPORT\.md$
 

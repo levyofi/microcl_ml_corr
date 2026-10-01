@@ -455,7 +455,11 @@ get_example_data <- function(filename,
   candidates <- c(
     file.path("inst", "extdata", filename),
     file.path("..", "extdata", filename),
+    file.path("..", "inst", "extdata", filename),
+    file.path("..", "..", "inst", "extdata", filename),
     file.path("..", "..", "extdata", filename),
+    file.path("..", "..", "..", "inst", "extdata", filename),
+    file.path("..", "..", "..", "extdata", filename),
     file.path("extdata", filename)
   )
   for (cand in candidates) {
@@ -487,21 +491,25 @@ get_example_data <- function(filename,
 
   message("Downloading example dataset '", filename, "' from repository...")
 
+  tmp_dest <- tempfile(pattern = "microcl_dl_")
   err <- tryCatch({
     utils::download.file(
       url      = download_url,
-      destfile = target_file,
+      destfile = tmp_dest,
       mode     = "wb",
       quiet    = FALSE
     )
     NULL
   }, error = function(e) e)
 
-  if (!is.null(err) || !file.exists(target_file) || file.size(target_file) == 0) {
-    if (file.exists(target_file)) unlink(target_file)
+  if (!is.null(err) || !file.exists(tmp_dest) || file.size(tmp_dest) == 0) {
+    if (file.exists(tmp_dest)) unlink(tmp_dest)
     stop("Failed to download '", filename, "' from: ", download_url,
          if (!is.null(err)) paste0("\nError: ", err$message) else "")
   }
+
+  file.copy(tmp_dest, target_file, overwrite = TRUE)
+  unlink(tmp_dest)
 
   message("Dataset cached at: ", normalizePath(target_file))
   normalizePath(target_file)

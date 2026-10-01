@@ -67,7 +67,13 @@ write.csv(aligned_pooled, out_path, row.names = FALSE)
 cat("Pooled CSV saved to:", out_path, "\n")
 
 # ── 5. Verify with microclCorr loader ──────────────────────────────────────────
+# Option A: Prepare directly in-memory using prepare_dataframe() (recommended)
+prep_df <- prepare_dataframe(aligned_pooled)
+cat("Prepared in-memory — rows:", nrow(prep_df), "| columns:", ncol(prep_df), "\n")
+cat("Sites in prepared data:", paste(unique(prep_df$site_id), collapse = ", "), "\n")
 
+# Option B: Or load from saved CSV using load_prepared_csv_data()
 loaded_df <- load_prepared_csv_data(out_path, includes_index = FALSE)
-cat("Loaded by microclCorr — rows:", nrow(loaded_df), "| columns:", ncol(loaded_df), "\n")
+cat("Loaded from CSV    — rows:", nrow(loaded_df), "| columns:", ncol(loaded_df), "\n")
 cat("Sites in loaded data:", paste(unique(loaded_df$site_id), collapse = ", "), "\n")
+
