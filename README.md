@@ -70,7 +70,7 @@ For journal editors and reviewers performing package verification:
 
 ```bash
 # Install all required and suggested dependencies
-Rscript -e 'install.packages(c("knitr", "testthat", "ranger", "keras3", "tensorflow", "reticulate", "rmarkdown"), repos = "https://cloud.r-project.org")'
+Rscript -e 'install.packages(c("knitr", "testthat", "ranger", "keras3", "tensorflow", "reticulate", "rmarkdown"))'
 
 # Download the microclCorr_0.1.0.tar.gz file from the repository
 
@@ -93,8 +93,12 @@ if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
 remotes::install_local("microclCorr_0.1.0.tar.gz")
 ```
 
-Alternatively, from the terminal:
+Alternatively, from the terminal (note that `R CMD INSTALL` does not automatically download CRAN dependencies, so `ranger` must be installed first if not already present):
 ```bash
+# 1. Install required dependency
+Rscript -e 'install.packages("ranger")'
+
+# 2. Install the package tarball
 R CMD INSTALL microclCorr_0.1.0.tar.gz
 ```
 
