@@ -40,7 +40,7 @@ The correction pipeline consists of data preparation, feature engineering, model
 
 ```{r workflow-diagram, echo = FALSE, out.width = "95%", fig.align = "center", purl = FALSE}
 img_path <- if (file.exists("workflow_combined.png")) "workflow_combined.png" else file.path("vignettes", "workflow_combined.png")
-knitr::include_graphics(img_path)
+if (file.exists(img_path)) knitr::include_graphics(img_path)
 ```
 
 ---
@@ -49,60 +49,84 @@ knitr::include_graphics(img_path)
 
 ### 1. Data Preparation and Ingestion
 
-The input data consists of time-aligned observations where physical model predictions and logger measurements have been paired. Columns typically include:
+The training pipeline begins with time-aligned observations where physical model predictions and in-situ logger measurements have been paired. Columns typically include:
 
 - `time`: Date-time timestamp
 - `measured`: Logger measurement ($^\circ\text{C}$)
 - `predicted`: Physical model prediction ($^\circ\text{C}$)
-- `residual`: Measured temperature minus predicted temperature
-- Environmental predictors (e.g. ambient air temperature, solar radiation, wind speed, relative humidity)
-- Optional grouping columns (e.g. `microhabitat` or `time_series_doc`)
+- `residual`: Measured temperature minus predicted temperature ($T_{\text{measured}} - T_{\text{predicted}}$)
+- Environmental predictors (e.g. ambient air temperature `TAREF`, solar radiation `SOLR`, wind speed `VREF`, relative humidity `RH`)
+- Optional grouping columns (e.g. categorical `microhabitat` or time series identifier `time_series_doc`)
 
-```{r eval = FALSE}
+`microclCorr` offers two ways to ingest and prepare datasets:
+
+#### Option A: Ingest from an aligned CSV file (`load_prepared_csv_data`)
+```r
 library(microclCorr)
 
-# Ingest prepared dataset
+# Ingest prepared CSV from disk or package example data
+csv_path <- get_example_data("Harod_dataset.csv")
 data <- load_prepared_csv_data(
-  path                       = "path/to/aligned_data.csv",
+  path                       = csv_path,
   is_continuous_microhabitat = FALSE,
-  datetime_format            = "%Y-%m-%d %H:%M:%S",
-  includes_index             = FALSE
+  datetime_format            = "%d/%m/%Y %H:%M",
+  includes_index             = TRUE
 )
 ```
+
+#### Option B: Prepare an in-memory data.frame (`prepare_dataframe`)
+If your dataset is already loaded into your R session (for instance, the bundled `microclimate_sample` dataset or a data frame constructed programmatically), use `prepare_dataframe()`:
+
+```r
+# Load bundled sample dataset
+data(microclimate_sample)
+
+# Parse datetime, encode microhabitat, and validate structure
+data <- prepare_dataframe(
+  df                         = microclimate_sample,
+  is_continuous_microhabitat = FALSE,
+  datetime_col               = "time",
+  microhabitat_col           = "microhabitat"
+)
+```
+
+---
 
 ### 2. Feature Engineering & Temporal Splitting
 
-Cyclical temporal features (hour of day, day of year) are extracted using sine and cosine transformations:
+Cyclical temporal features (hour of day, and optionally month of year) are extracted using sine and cosine transformations:
 
-```{r eval = FALSE}
-# Add cyclical diurnal features
-data <- add_cyclical_time(data, datetime_col = "time")
+```r
+# Add cyclical diurnal features (Hour_sin, Hour_cos)
+data <- add_cyclical_time(data, datetime_col = "time", add_month = FALSE)
 
-# Automatically detect predictor features (excluding identifiers and target variables)
+# Automatically identify numeric environmental predictor columns
 feature_cols <- get_feature_columns(data)
 ```
 
-To avoid temporal data leakage (where random splitting lets models interpolate between adjacent hours), `microclCorr` uses **blocked cross-validation**:
+To avoid temporal data leakage (where random row-level splitting lets models interpolate between adjacent hours), `microclCorr` uses **blocked cross-validation**:
 
-```{r eval = FALSE}
-# Block-temporal split: 75% train, 12.5% validation, 12.5% test in 7-day blocks
+```r
+# Block-temporal split: 70% train, 15% validation, 15% test in contiguous 2-day blocks
 splits <- split_train_val_test(
   data       = data,
-  train_pct  = 0.75,
-  val_pct    = 0.125,
-  block_days = 7,
+  train_pct  = 0.70,
+  val_pct    = 0.15,
+  block_days = 2,
   seed       = 42
 )
 ```
+
+For datasets containing multiple loggers, sites, or microhabitats, use `stratified_split_train_val_test()` to ensure balanced temporal representation across all groups.
 
 ---
 
 ### 3. Model Training
 
 #### Random Forest
-Random Forest fits an ensemble of regression trees to predict residuals from feature variables:
+Random Forest fits an ensemble of regression trees to predict residuals from environmental features:
 
-```{r eval = FALSE}
+```r
 rf_model <- train_rf(
   train_X        = splits$train[, feature_cols],
   train_y        = splits$train$residual,
@@ -117,24 +141,25 @@ rf_model <- train_rf(
 
 #### LSTM Neural Network
 
-LSTM models capture temporal memory and thermal inertia. Because LSTM models rely on TensorFlow and Keras via `reticulate`, configure TensorFlow at the start of your R session:
+LSTM models capture temporal memory and thermal inertia. Because LSTM models rely on TensorFlow and Keras via `reticulate`, verify or configure the environment at the start of your session:
 
-```{r eval = FALSE}
+```r
+# Check or configure Python/TensorFlow environment
 setup_tensorflow()
 ```
 
 Data are scaled and structured into fixed sliding sequence windows before model training:
 
-```{r eval = FALSE}
+```r
 # Normalize features using min-max scaling fitted strictly on training data
 scaled <- lstm_scaling(splits$train, splits$val, splits$test)
 
-# Reshape continuous time series into sliding sequence windows (e.g. 6-hour lookback)
+# Reshape continuous time series into sliding sequence windows (e.g. 4-hour lookback)
 lstm_data <- lstm_specific_preprocessing(
   train        = scaled$train,
   val          = scaled$val,
   test         = scaled$test,
-  window_size  = 6,
+  window_size  = 4,
   ts_names_col = "time_series_doc"
 )
 ```
@@ -143,14 +168,7 @@ lstm_data <- lstm_specific_preprocessing(
 
 Rather than relying on arbitrary neural architecture choices, `lstm_hypertuning()` performs random search across key structural and optimization parameters:
 
-- **`units_range`**: Hidden LSTM units per layer (sampled in steps of 32)
-- **`layers_range`**: Number of stacked LSTM layers
-- **`dropout_range`**: Dropout rate between layers to prevent overfitting
-- **`lr_range`**: Learning rate for the Adam optimizer (sampled log-uniformly)
-
-Early stopping (`patience`) halts non-improving epochs early to prevent overfitting:
-
-```{r eval = FALSE}
+```r
 # Search for optimal LSTM architecture over random trials
 hpo <- lstm_hypertuning(
   train_X       = lstm_data$train_dict$X,
@@ -158,42 +176,20 @@ hpo <- lstm_hypertuning(
   val_X         = lstm_data$val_dict$X,
   val_y         = lstm_data$val_dict$y,
   n_trials      = 5,
-  units_range   = c(32, 256),
+  units_range   = c(32, 128),
   layers_range  = c(1, 2),
-  dropout_range = c(0.0, 0.3),
+  dropout_range = c(0.0, 0.2),
   lr_range      = c(1e-4, 1e-2),
-  epochs        = 60,
+  epochs        = 40,
   batch_size    = 32,
   patience      = 8,
   seed          = 42
 )
 
-# Best configuration and corresponding fitted model
-best_params <- hpo$params
-lstm_model  <- hpo$model
-cat(sprintf("Best architecture: %d units, %d layers, dropout = %.2f, lr = %.5f\n",
-            best_params$n_units, best_params$n_layers, best_params$dropout, best_params$lr))
+best_lstm <- hpo$model
 ```
 
-Alternatively, if preferred hyperparameters are already known, a specific architecture can be trained directly using `train_lstm()`:
-
-```{r eval = FALSE}
-# Direct training with fixed hyperparameters
-lstm_model <- train_lstm(
-  train_X    = lstm_data$train_dict$X,
-  train_y    = lstm_data$train_dict$y,
-  val_X      = lstm_data$val_dict$X,
-  val_y      = lstm_data$val_dict$y,
-  n_units    = 64,
-  n_layers   = 2,
-  dropout    = 0.1,
-  lr         = 0.001,
-  epochs     = 100,
-  batch_size = 32,
-  patience   = 10,
-  seed       = 42
-)
-```
+Alternatively, train directly with chosen hyperparameters using `train_lstm()`.
 
 ---
 
@@ -204,7 +200,7 @@ Performance is quantified by comparing the Root Mean Square Error (RMSE) and coe
 #### Aligning Test Sets (`align_test_sets`)
 Because LSTM sequence windows omit the first $(window\_size - 1)$ hours of each time series, `align_test_sets()` filters the Random Forest test set to evaluate both models on identical timestamps:
 
-```{r eval = FALSE}
+```r
 # Align tabular test set to match LSTM window endpoints
 aligned_test_rf <- align_test_sets(
   test_dataset   = splits$test,
@@ -225,126 +221,171 @@ metrics_rf <- evaluate_correction(
 
 # Evaluate LSTM on test windows
 metrics_lstm <- evaluate_correction(
-  model           = lstm_model,
+  model           = best_lstm,
   X               = lstm_data$test_dict$X,
   y               = lstm_data$test_dict$y,
   base_prediction = lstm_data$test_dict$base_pred,
   model_type      = "lstm"
 )
 
-metrics_rf
-metrics_lstm
+print(metrics_rf)
+print(metrics_lstm)
 ```
 
 ---
 
-### 5. Deployment and Inference
+### 5. Model Persistence (`save_correction_model` / `load_correction_model`)
 
-The selected model and associated metadata (feature columns, scalers) are bundled and saved. For LSTM models, the min-max scaler is bundled to transform new observations:
+Once trained, models can be bundled with their required metadata (feature columns, model type, and scaling parameters) into a single `.rds` file:
 
-```{r eval = FALSE}
-# Save Random Forest bundle (scaler = NULL)
+```r
+# Save Random Forest model bundle
 save_correction_model(
   model        = rf_model,
-  scaler       = NULL,
   feature_cols = feature_cols,
   path         = "best_rf_model.rds"
 )
 
-# Save LSTM bundle (includes scaler parameters)
+# Save LSTM bundle (automatically includes scaler and serializes neural network weights)
 save_correction_model(
-  model        = lstm_model,
+  model        = best_lstm,
   scaler       = scaled$scaler,
   feature_cols = feature_cols,
   path         = "best_lstm_model.rds"
 )
 
-# Load model and apply correction to new physical model predictions
-loaded_bundle <- load_correction_model("best_rf_model.rds")
+# Load the saved model bundle in any new R session
+bundle <- load_correction_model("best_rf_model.rds")
+```
 
+---
+
+### 6. Predicting on New Data (`correct_predictions`)
+
+The ultimate objective of `microclCorr` is to correct **new, unmeasured physical model predictions**—such as future weather forecasts, historical reconstructions, unmeasured seasons, or new microhabitats where no field loggers exist.
+
+In this scenario:
+- **`new_data`** contains the mechanistic model predictions (e.g. `predicted` column from NicheMapR) and environmental forcing features (`TAREF`, `SOLR`, etc.).
+- Ground-truth logger measurements (`measured`) and target residuals (`residual`) are **not available** and not needed.
+
+The function `correct_predictions()` applies the trained model, estimates the expected residual correction, and returns the final corrected microclimate values:
+
+$$\text{corrected\_prediction} = \text{base\_prediction} + \text{correction}$$
+
+```r
+# Apply model to new physical model predictions
 corrected_df <- correct_predictions(
-  model        = loaded_bundle$model,
+  model        = bundle$model,
   new_data     = new_physical_data,
-  model_type   = loaded_bundle$model_type,
-  feature_cols = loaded_bundle$feature_cols
+  model_type   = bundle$model_type,
+  feature_cols = bundle$feature_cols,
+  scaler       = bundle$scaler # required for LSTM, ignored for RF
 )
 ```
+
+The output is a clean data.frame with:
+- `datetime`: Timestamps of each prediction point
+- `base_prediction`: Uncorrected physical model predictions
+- `correction`: Estimated residual correction ($\widehat{\text{residual}}$)
+- `corrected_prediction`: Final corrected temperature ($T_{\text{predicted}} + \widehat{\text{residual}}$)
 
 ---
 
 ## Reproducible End-to-End Example
 
-The following self-contained example demonstrates the complete pipeline on synthetic microclimate data:
+The following self-contained example runs the complete pipeline on the bundled `microclimate_sample` dataset, demonstrating model training, evaluation, saving/loading, and **predicting on new unmeasured data**.
 
 ```{r reproducible-example}
 library(microclCorr)
 
-# 1. Generate synthetic hourly microclimate observations
-set.seed(42)
-n_hours <- 240
-times <- seq(as.POSIXct("2024-05-01 00:00:00", tz = "UTC"), by = "hour", length.out = n_hours)
+# ── 1. Load Bundled Empirical Data ───────────────────────────────────────────
+data(microclimate_sample)
 
-# Simulating physical model prediction with diurnal cycle
-physical_pred <- 20 + 7 * sin(2 * pi * (1:n_hours) / 24)
+# Prepare dataset (parses datetime, validates columns, one-hot encodes microhabitat)
+prepared <- prepare_dataframe(microclimate_sample)
 
-# Simulating true temperature with a systematic 3°C bias plus nonlinear thermal response
-ambient_temp <- physical_pred + rnorm(n_hours, mean = 0, sd = 0.5)
-solar_flux <- pmax(0, 800 * sin(pi * ((1:n_hours) %% 24) / 24) + rnorm(n_hours, 0, 30))
-measured_temp <- physical_pred + 2.5 + 0.003 * solar_flux + rnorm(n_hours, mean = 0, sd = 0.4)
-true_residual <- measured_temp - physical_pred
+# Define predictor feature columns
+features <- c("TAREF", "RH", "VREF", "SOLR", "TSKYC", "DEW",
+              "Hour_sin", "Hour_cos",
+              "microhabitat_air", "microhabitat_shade", "microhabitat_sun")
 
-df <- data.frame(
-  time = times,
-  predicted = physical_pred,
-  temp_air = ambient_temp,
-  solar_rad = solar_flux,
-  residual = true_residual,
-  time_series_doc = "sensor_1"
+# ── 2. Blocked Temporal Split ────────────────────────────────────────────────
+# 70% training, 15% validation, 15% testing in 2-day contiguous blocks
+splits <- split_train_val_test(
+  prepared,
+  train_pct  = 0.70,
+  val_pct    = 0.15,
+  block_days = 2,
+  seed       = 42
 )
 
-# 2. Add cyclical features
-df <- add_cyclical_time(df, datetime_col = "time")
-features <- c("temp_air", "solar_rad", "Hour_sin", "Hour_cos")
-
-# 3. Partition into train / test sets
-splits <- split_train_val_test(df, train_pct = 0.70, val_pct = 0.15, block_days = 2, seed = 42)
-
-# 4. Train Random Forest model
-rf_mod <- train_rf(
+# ── 3. Train Random Forest Model ─────────────────────────────────────────────
+rf_model <- train_rf(
   train_X   = splits$train[, features],
   train_y   = splits$train$residual,
-  num_trees = 50,
+  num_trees = 100,
   tune      = FALSE,
   seed      = 42
 )
 
-# 5. Evaluate correction on test set
-eval_res <- evaluate_correction(
-  model           = rf_mod,
+# ── 4. Evaluate Correction Performance on Test Set ───────────────────────────
+eval_results <- evaluate_correction(
+  model           = rf_model,
   X               = splits$test[, features],
   y               = splits$test$residual,
   base_prediction = splits$test$predicted,
   model_type      = "rf"
 )
 
-eval_res
+cat(sprintf("Baseline Uncorrected RMSE : %.2f deg C (R^2 = %.3f)\n",
+            eval_results$rmse_base, eval_results$r2_base))
+cat(sprintf("ML-Corrected RMSE         : %.2f deg C (R^2 = %.3f)\n",
+            eval_results$rmse_corr, eval_results$r2_corr))
+cat(sprintf("RMSE Error Reduction      : %.1f%%\n",
+            100 * (1 - eval_results$rmse_corr / eval_results$rmse_base)))
 
-# 6. Apply correction to new data
-corrected_output <- correct_predictions(
-  model        = rf_mod,
-  new_data     = splits$test,
-  model_type   = "rf",
-  feature_cols = features
+# ── 5. Save and Reload Model Bundle ──────────────────────────────────────────
+tmp_model_file <- tempfile(fileext = ".rds")
+save_correction_model(
+  model        = rf_model,
+  feature_cols = features,
+  path         = tmp_model_file
 )
 
-head(corrected_output)
+# Load the saved model bundle
+bundle <- load_correction_model(tmp_model_file)
+unlink(tmp_model_file)
+
+# ── 6. Predicting on New Unmeasured Data ─────────────────────────────────────
+# Simulate a new dataset of physical model predictions where no field loggers exist.
+# Notice that ground-truth measurements (residual, logger columns) are omitted:
+new_physical_data <- splits$test
+new_physical_data$residual   <- NULL  # Residuals are unknown in real deployment!
+new_physical_data$sun_temp   <- NULL
+new_physical_data$shade_temp <- NULL
+new_physical_data$air_temp   <- NULL
+
+# Apply the correction model to the new physical predictions
+corrected_predictions <- correct_predictions(
+  model        = bundle$model,
+  new_data     = new_physical_data,
+  model_type   = bundle$model_type,
+  feature_cols = bundle$feature_cols
+)
+
+# Inspect the corrected output
+head(corrected_predictions)
 ```
 
-### Extending to LSTM with Hyperparameter Tuning
+Notice that `correct_predictions()` seamlessly returns the original mechanistic baseline (`base_prediction`), the estimated correction (`correction`), and the final corrected value (`corrected_prediction`).
 
-For datasets with strong temporal autocorrelation or thermal inertia, an LSTM network can be tuned and compared directly against Random Forest using the same synthetic dataset:
+---
 
-```{r lstm-reproducible-example, eval = FALSE}
+### Extending to LSTM Models
+
+For time series exhibiting significant thermal inertia, an LSTM recurrent neural network can be trained and deployed using the exact same workflow:
+
+```{r lstm-pipeline, eval = FALSE}
 # 0. Configure Python and TensorFlow environment
 setup_tensorflow()
 
@@ -360,45 +401,38 @@ lstm_data <- lstm_specific_preprocessing(
   ts_names_col = "time_series_doc"
 )
 
-# 3. Automated hyperparameter tuning with early stopping
-hpo <- lstm_hypertuning(
-  train_X       = lstm_data$train_dict$X,
-  train_y       = lstm_data$train_dict$y,
-  val_X         = lstm_data$val_dict$X,
-  val_y         = lstm_data$val_dict$y,
-  n_trials      = 3,
-  units_range   = c(32, 128),
-  layers_range  = c(1, 2),
-  dropout_range = c(0.0, 0.2),
-  lr_range      = c(1e-3, 5e-3),
-  epochs        = 30,
-  batch_size    = 16,
-  patience      = 5,
-  seed          = 42
+# 3. Train LSTM model (or use lstm_hypertuning for automated tuning)
+lstm_model <- train_lstm(
+  train_X    = lstm_data$train_dict$X,
+  train_y    = lstm_data$train_dict$y,
+  val_X      = lstm_data$val_dict$X,
+  val_y      = lstm_data$val_dict$y,
+  n_units    = 64,
+  n_layers   = 2,
+  dropout    = 0.1,
+  lr         = 0.001,
+  epochs     = 50,
+  batch_size = 32,
+  seed       = 42
 )
 
-# Retrieve best tuned model and architecture parameters
-best_lstm <- hpo$model
-print(hpo$params)
-
-# 4. Evaluate LSTM predictions on test windows
-eval_lstm <- evaluate_correction(
-  model           = best_lstm,
-  X               = lstm_data$test_dict$X,
-  y               = lstm_data$test_dict$y,
-  base_prediction = lstm_data$test_dict$base_pred,
-  model_type      = "lstm"
-)
-
-eval_lstm
-
-# 5. Apply LSTM correction to new observations
-corrected_lstm <- correct_predictions(
-  model        = best_lstm,
-  new_data     = splits$test,
-  model_type   = "lstm",
-  feature_cols = features,
+# 4. Save LSTM bundle (includes scaler parameters)
+save_correction_model(
+  model        = lstm_model,
   scaler       = scaled$scaler,
+  feature_cols = features,
+  path         = "best_lstm_model.rds"
+)
+
+# 5. Predict on new unmeasured data using the saved scaler
+loaded_lstm <- load_correction_model("best_lstm_model.rds")
+
+corrected_lstm <- correct_predictions(
+  model        = loaded_lstm$model,
+  new_data     = new_physical_data,
+  model_type   = "lstm",
+  feature_cols = loaded_lstm$feature_cols,
+  scaler       = loaded_lstm$scaler,
   window_size  = 4,
   datetime_col = "time"
 )

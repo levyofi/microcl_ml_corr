@@ -136,7 +136,7 @@ check_tensorflow <- function() {
 #' Python pointers and providing a self-contained bundle across R sessions.
 #'
 #' @param model Trained model (ranger or keras)
-#' @param scaler List with min/max from scaling
+#' @param scaler List with min/max from scaling (default NULL for Random Forest)
 #' @param feature_cols Character vector of feature column names
 #' @param path File path to save to (will create .rds file)
 #' @return Invisible file path to the saved model file.
@@ -145,10 +145,10 @@ check_tensorflow <- function() {
 #' feature_cols <- c("TAREF", "RH", "VREF", "SOLR")
 #' rf <- train_rf(microclimate_sample[, feature_cols], microclimate_sample$residual, num_trees = 5, tune = FALSE)
 #' tmp <- tempfile(fileext = ".rds")
-#' save_correction_model(rf, scaler = NULL, feature_cols = feature_cols, path = tmp)
+#' save_correction_model(rf, feature_cols = feature_cols, path = tmp)
 #' unlink(tmp)
 #' @export
-save_correction_model <- function(model, scaler, feature_cols, path) {
+save_correction_model <- function(model, scaler = NULL, feature_cols, path) {
   is_rf      <- inherits(model, "ranger")
   model_type <- if (is_rf) "rf" else "lstm"
 

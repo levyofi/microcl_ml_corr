@@ -18,7 +18,7 @@
 ^inst/examples/results/.*$
 ^inst/examples/.*\.png$
 ^\.claude$
-^.*\.rds$
+^inst/examples/.*\.rds$
 ^QA_TEST_PLAN\.md$
 ^QA_TEST_REPORT\.md$
 

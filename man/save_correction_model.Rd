@@ -4,12 +4,12 @@
 \alias{save_correction_model}
 \title{Save a correction model to disk}
 \usage{
-save_correction_model(model, scaler, feature_cols, path)
+save_correction_model(model, scaler = NULL, feature_cols, path)
 }
 \arguments{
 \item{model}{Trained model (ranger or keras)}
 
-\item{scaler}{List with min/max from scaling}
+\item{scaler}{List with min/max from scaling (default NULL for Random Forest)}
 
 \item{feature_cols}{Character vector of feature column names}
 
