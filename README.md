@@ -146,6 +146,18 @@ The package includes eight fully worked scenario scripts in [`inst/examples/`](i
 
 Each example is a self-contained R script with plain-English comments throughout. To run an example, open the corresponding `run_scenario_N.R` file in RStudio and click **Source**.
 
+Input datasets required by the scenarios are located automatically via `get_example_data()` (which checks bundled package files, local project paths, or downloads on demand if needed).
+
+### Exploring Example Data
+
+You can also explore a sample microclimate dataset bundled directly with the package using the `data()` function:
+
+```R
+library(microclCorr)
+data(microclimate_sample)
+head(microclimate_sample)
+```
+
 See the [examples README](inst/examples/README.md) for a summary of results across all scenarios.
 
 ---

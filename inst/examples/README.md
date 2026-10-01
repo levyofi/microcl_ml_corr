@@ -90,8 +90,7 @@ Open any `run_scenario_N.R` file in RStudio and click **Source**, or run from yo
 source(system.file("examples", "scenario_1_valley_single_logger", "run_scenario_1.R", package = "microclCorr"))
 ```
 
-All input data is bundled with the package and located automatically via
-`system.file()`. Results are written to the `results/` subfolder of each scenario.
+All input data is located automatically via `get_example_data()` (which checks bundled package files, local project paths, or downloads on demand if needed). Results are written to the `results/` subfolder of each scenario.
 
 ---
 
